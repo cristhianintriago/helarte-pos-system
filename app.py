@@ -146,6 +146,17 @@ def usuarios():
         return redirect(url_for('index'))
     return render_template('usuarios.html')
 
+@app.route('/limpiar-datos', methods=['GET'])
+def limpiar_datos():
+    from models.models import Venta, Pedido, DetallePedido, Caja, Egreso
+
+    Egreso.query.delete()
+    Caja.query.delete()
+    Venta.query.delete()
+    DetallePedido.query.delete()
+    Pedido.query.delete()
+    db.session.commit()
+    return jsonify({'mensaje': 'Datos limpiados, productos intactos ✅'})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
