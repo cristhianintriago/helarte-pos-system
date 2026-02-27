@@ -1,5 +1,10 @@
-from dotenv import load_dotenv
-load_dotenv()  # Carga las variables del .env
+import os
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # Funciona en local, se ignora en Railway
+except ImportError:
+    pass  # Railway no necesita .env, usa sus propias variables
+
 from flask import Flask, redirect, render_template, jsonify, url_for
 from flask_login import LoginManager, login_required, current_user
 from models.models import db
@@ -13,13 +18,12 @@ from routes.auth import auth_bp
 from routes.reporte_diario import reporte_diario_bp
 from routes.usuarios import usuarios_bp
 import hashlib
-import os
 from datetime import date
 
 
 app = Flask(__name__)
 
-# ── NUEVO: PostgreSQL en Railway, SQLite local
+# ── PostgreSQL en Railway, SQLite local
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///helarte.db')
 if database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
@@ -148,6 +152,7 @@ def usuarios():
         return redirect(url_for('index'))
     return render_template('usuarios.html')
 
+
 @app.route('/limpiar-datos', methods=['GET'])
 def limpiar_datos():
     from models.models import Venta, Pedido, DetallePedido, Caja, Egreso
@@ -159,6 +164,7 @@ def limpiar_datos():
     Pedido.query.delete()
     db.session.commit()
     return jsonify({'mensaje': 'Datos limpiados, productos intactos ✅'})
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
