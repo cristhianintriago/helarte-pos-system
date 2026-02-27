@@ -1,0 +1,97 @@
+{% extends "base.html" %} {% block titulo %}Inicio{% endblock %} {% block
+contenido %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-8 text-center">
+    <div class="mb-4">
+      <span style="font-size: 5rem">🍦</span>
+      <h1 class="fw-bold mt-3">Bienvenida a Helarte</h1>
+      <p class="text-muted fs-5">Sistema de gestión de pedidos y caja</p>
+    </div>
+
+    <!-- Tarjetas de acceso rápido -->
+    <div class="row g-4 mt-2">
+      <div class="col-6 col-md-3">
+        <a href="/pedidos" class="text-decoration-none">
+          <div class="card shadow-sm h-100 hover-card">
+            <div class="card-body text-center py-4">
+              <div class="fs-1">📋</div>
+              <p class="fw-bold mb-0 mt-2">Pedidos</p>
+            </div>
+          </div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3">
+        <a href="/ventas" class="text-decoration-none">
+          <div class="card shadow-sm h-100 hover-card">
+            <div class="card-body text-center py-4">
+              <div class="fs-1">💰</div>
+              <p class="fw-bold mb-0 mt-2">Ventas</p>
+            </div>
+          </div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3">
+        <a href="/caja" class="text-decoration-none">
+          <div class="card shadow-sm h-100 hover-card">
+            <div class="card-body text-center py-4">
+              <div class="fs-1">🗃️</div>
+              <p class="fw-bold mb-0 mt-2">Caja</p>
+            </div>
+          </div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3">
+        <a href="/productos" class="text-decoration-none">
+          <div class="card shadow-sm h-100 hover-card">
+            <div class="card-body text-center py-4">
+              <div class="fs-1">🍧</div>
+              <p class="fw-bold mb-0 mt-2">Productos</p>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Estado de caja en tiempo real -->
+    <div class="card mt-5 shadow-sm">
+      <div class="card-body">
+        <h6 class="text-muted mb-3">Estado actual del sistema</h6>
+        <div class="row text-center" id="estado-sistema">
+          <div class="col-4">
+            <h4 id="stat-pedidos" class="fw-bold">-</h4>
+            <small class="text-muted">Pedidos activos</small>
+          </div>
+          <div class="col-4">
+            <h4 id="stat-ventas" class="fw-bold text-success">-</h4>
+            <small class="text-muted">Ventas hoy</small>
+          </div>
+          <div class="col-4">
+            <h4 id="stat-caja" class="fw-bold">-</h4>
+            <small class="text-muted">Caja</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // Cargamos estadísticas rápidas al inicio
+  document.addEventListener("DOMContentLoaded", async () => {
+    // Pedidos activos
+    const pedidos = await fetch("/pedidos/").then((r) => r.json());
+    document.getElementById("stat-pedidos").textContent = pedidos.length;
+
+    // Ventas del día
+    const ventas = await fetch("/ventas/").then((r) => r.json());
+    document.getElementById("stat-ventas").textContent =
+      `$${ventas.total_vendido.toFixed(2)}`;
+
+    // Estado de caja
+    const caja = await fetch("/caja/estado").then((r) => r.json());
+    const statCaja = document.getElementById("stat-caja");
+    statCaja.textContent =
+      caja.estado === "abierta" ? "🟢 Abierta" : "🔴 Cerrada";
+  });
+</script>
+{% endblock %}

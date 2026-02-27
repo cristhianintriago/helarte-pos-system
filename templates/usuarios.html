@@ -1,0 +1,86 @@
+{% extends "base.html" %} {% block titulo %}Usuarios{% endblock %} {% block
+contenido %}
+<div class="row mb-4">
+  <div class="col">
+    <h4><i class="bi bi-people"></i> Gestión de Usuarios</h4>
+  </div>
+  <div class="col-auto">
+    <button
+      class="btn btn-dark"
+      data-bs-toggle="modal"
+      data-bs-target="#modal-usuario"
+    >
+      <i class="bi bi-person-plus"></i> Nuevo Usuario
+    </button>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Usuario</th>
+          <th>Rol</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-usuarios"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL CREAR/EDITAR -->
+<div class="modal fade" id="modal-usuario" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="modal-titulo">Nuevo Usuario</h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="usuario-id" />
+        <div class="mb-3">
+          <label class="form-label">Nombre de usuario *</label>
+          <input
+            type="text"
+            id="usuario-username"
+            class="form-control"
+            placeholder="Ej: maria"
+          />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contraseña *</label>
+          <input
+            type="password"
+            id="usuario-password"
+            class="form-control"
+            placeholder="Dejar vacío para no cambiar al editar"
+          />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Rol *</label>
+          <select id="usuario-rol" class="form-select">
+            <option value="empleado">Empleado</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button class="btn btn-dark" onclick="guardarUsuario()">
+          <i class="bi bi-save"></i> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/usuarios.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %} {% block titulo %}Productos{% endblock %} {% block
+contenido %}
+<div class="row mb-4">
+  <div class="col">
+    <h4><i class="bi bi-grid"></i> Gestión de Productos</h4>
+  </div>
+  <div class="col-auto">
+    <button
+      class="btn btn-dark"
+      data-bs-toggle="modal"
+      data-bs-target="#modal-producto"
+    >
+      <i class="bi bi-plus-circle"></i> Nuevo Producto
+    </button>
+  </div>
+</div>
+
+<!-- FILTRO POR CATEGORÍA -->
+<div id="filtros" class="mb-4 d-flex flex-wrap gap-2">
+  <button
+    class="btn btn-sm btn-dark filtro-btn activo"
+    onclick="filtrar('todas', event)"
+  >
+    Todas
+  </button>
+</div>
+
+<!-- TABLA DE PRODUCTOS -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>Producto</th>
+          <th>Categoría</th>
+          <th>Precio</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-productos"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- MODAL: CREAR / EDITAR PRODUCTO -->
+<div class="modal fade" id="modal-producto" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title" id="modal-titulo">Nuevo Producto</h5>
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          data-bs-dismiss="modal"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <!-- Campo oculto para saber si estamos editando -->
+        <input type="hidden" id="producto-id" />
+
+        <div class="mb-3">
+          <label class="form-label">Nombre del producto *</label>
+          <input
+            type="text"
+            id="producto-nombre"
+            class="form-control"
+            placeholder="Ej: Copa Oreo"
+          />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Categoría *</label>
+          <input
+            type="text"
+            id="producto-categoria"
+            class="form-control"
+            placeholder="Ej: Copa, Sundae, Malteada"
+          />
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Precio *</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input
+              type="number"
+              id="producto-precio"
+              class="form-control"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+            />
+          </div>
+        </div>
+        <div class="form-check">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="producto-disponible"
+            checked
+          />
+          <label class="form-check-label">Disponible en carta</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button class="btn btn-dark" onclick="guardarProducto()">
+          <i class="bi bi-save"></i> Guardar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CONFIRMAR ELIMINACIÓN -->
+<div class="modal fade" id="modal-eliminar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title">⚠️ Confirmar Eliminación</h5>
+      </div>
+      <div class="modal-body">
+        ¿Estás segura de eliminar el producto
+        <strong id="nombre-eliminar"></strong>? Esta acción no se puede
+        deshacer.
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          Cancelar
+        </button>
+        <button class="btn btn-danger" onclick="confirmarEliminar()">
+          <i class="bi bi-trash"></i> Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/productos.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block titulo %}Registro de Ventas{% endblock %}
+{% block contenido %}
+
+<div class="row mb-4">
+    <div class="col">
+        <h4><i class="bi bi-graph-up"></i> Ventas del Día</h4>
+    </div>
+</div>
+
+<!-- TARJETAS DE RESUMEN -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <div class="fs-2">🧾</div>
+                <h6 class="text-muted">Pedidos Hoy</h6>
+                <h4 id="total-pedidos" class="fw-bold">0</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <div class="fs-2">💰</div>
+                <h6 class="text-muted">Total Vendido</h6>
+                <h4 id="total-vendido" class="fw-bold text-success">$0.00</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <div class="fs-2">🛵</div>
+                <h6 class="text-muted">Deliveries</h6>
+                <h4 id="total-delivery" class="fw-bold">0</h4>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <div class="fs-2">🏪</div>
+                <h6 class="text-muted">En Local</h6>
+                <h4 id="total-local" class="fw-bold">0</h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PEDIDOS ACTIVOS -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white d-flex justify-content-between">
+                <span><i class="bi bi-clock"></i> Pedidos Activos</span>
+                <button class="btn btn-sm btn-outline-light" onclick="cargarDatos()">
+                    <i class="bi bi-arrow-clockwise"></i> Actualizar
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div id="lista-pedidos-activos" class="list-group list-group-flush"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VENTAS COMPLETADAS -->
+<div class="row">
+    <div class="col">
+        <div class="card shadow-sm">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-check-circle"></i> Ventas Completadas Hoy
+            </div>
+            <div class="card-body p-0">
+                <div id="lista-ventas" class="list-group list-group-flush"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/ventas.js') }}"></script>
+{% endblock %}

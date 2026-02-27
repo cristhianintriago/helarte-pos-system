@@ -1,0 +1,136 @@
+{% extends "base.html" %} {% block titulo %}Reportes{% endblock %} {% block
+contenido %}
+
+<div class="row mb-4">
+    <div class="col">
+        <h4><i class="bi bi-bar-chart"></i> Reportes</h4>
+    </div>
+    <div class="col-auto">
+        <button class="btn btn-danger" onclick="descargarPDFHoy()">
+            <i class="bi bi-file-pdf"></i> Reporte de Hoy (PDF)
+        </button>
+        <button class="btn btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modal-historial">
+            <i class="bi bi-clock-history"></i> Histórico
+        </button>
+    </div>
+</div>
+
+<!-- SELECTOR DE PERÍODO -->
+<div class="card shadow-sm mb-4">
+  <div class="card-body">
+    <div class="row align-items-end g-3">
+      <div class="col-md-4">
+        <label class="form-label">Desde</label>
+        <input type="date" id="fecha-desde" class="form-control" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Hasta</label>
+        <input type="date" id="fecha-hasta" class="form-control" />
+      </div>
+      <div class="col-md-4">
+        <button class="btn btn-dark w-100" onclick="cargarReporte()">
+          <i class="bi bi-search"></i> Generar Reporte
+        </button>
+      </div>
+    </div>
+    <!-- Accesos rápidos de período -->
+    <div class="mt-3 d-flex gap-2 flex-wrap">
+      <button class="btn btn-sm btn-outline-dark" onclick="setPeriodo('hoy')">
+        Hoy
+      </button>
+      <button
+        class="btn btn-sm btn-outline-dark"
+        onclick="setPeriodo('semana')"
+      >
+        Esta semana
+      </button>
+      <button class="btn btn-sm btn-outline-dark" onclick="setPeriodo('mes')">
+        Este mes
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TARJETAS DE RESUMEN -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <div class="fs-2">🧾</div>
+        <h6 class="text-muted">Total Pedidos</h6>
+        <h3 id="rep-pedidos" class="fw-bold">-</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <div class="fs-2">💰</div>
+        <h6 class="text-muted">Total Vendido</h6>
+        <h3 id="rep-total" class="fw-bold text-success">-</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <div class="fs-2">📦</div>
+        <h6 class="text-muted">Producto Top</h6>
+        <h6 id="rep-top" class="fw-bold">-</h6>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center shadow-sm">
+      <div class="card-body">
+        <div class="fs-2">📊</div>
+        <h6 class="text-muted">Promedio por Venta</h6>
+        <h3 id="rep-promedio" class="fw-bold text-primary">-</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- VENTAS POR DÍA -->
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-dark text-white">
+        <i class="bi bi-calendar3"></i> Ventas por Día
+      </div>
+      <div class="card-body p-0">
+        <div id="lista-por-dia" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRODUCTOS MÁS VENDIDOS -->
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-dark text-white">
+        <i class="bi bi-trophy"></i> Productos Más Vendidos
+      </div>
+      <div class="card-body p-0">
+        <div id="lista-top-productos" class="list-group list-group-flush"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/reportes.js') }}"></script>
+{% endblock %}
+<!-- MODAL HISTÓRICO -->
+<div class="modal fade" id="modal-historial" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">📚 Reportes Anteriores (últimos 30 días)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="lista-historial" class="list-group"></div>
+            </div>
+        </div>
+    </div>
+</div>

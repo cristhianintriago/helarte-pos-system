@@ -1,0 +1,165 @@
+{% extends "base.html" %} {% block titulo %}Caja{% endblock %} {% block contenido %}
+<div class="row mb-4">
+  <div class="col">
+    <h4><i class="bi bi-cash-stack"></i> Control de Caja</h4>
+  </div>
+</div>
+
+<!-- ESTADO CAJA CERRADA -->
+<div id="caja-cerrada" class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm text-center">
+      <div class="card-body py-5">
+        <div class="fs-1">🔒</div>
+        <h5 class="mb-3">No hay caja abierta</h5>
+        <div class="mb-3">
+          <label class="form-label">Monto inicial de caja</label>
+          <input
+            type="number"
+            id="monto-inicial"
+            class="form-control"
+            placeholder="Ej: 50.00"
+            step="0.01"
+            min="0"
+          />
+        </div>
+        <button class="btn btn-success btn-lg w-100" onclick="abrirCaja()">
+          <i class="bi bi-unlock"></i> Abrir Caja
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ESTADO CAJA ABIERTA -->
+<div id="caja-abierta" style="display: none">
+  <div class="row g-4">
+    <!-- RESUMEN -->
+    <div class="col-md-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+          <i class="bi bi-unlock"></i> Caja Abierta
+        </div>
+        <div class="card-body">
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Monto inicial:</span>
+            <span id="resumen-inicial" class="fw-bold">$0.00</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Total ingresos:</span>
+            <span id="resumen-ingresos" class="fw-bold text-success">$0.00</span>
+          </div>
+          <div class="d-flex justify-content-between mb-2">
+            <span class="text-muted">Total egresos:</span>
+            <span id="resumen-egresos" class="fw-bold text-danger">$0.00</span>
+          </div>
+          <hr />
+          <div class="d-flex justify-content-between">
+            <span class="fw-bold fs-5">Balance actual:</span>
+            <span id="resumen-balance" class="fw-bold fs-5 text-primary">$0.00</span>
+          </div>
+          <button class="btn btn-danger w-100 mt-4" onclick="cerrarCaja()">
+            <i class="bi bi-lock"></i> Cerrar Caja
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- REGISTRAR EGRESO -->
+    <div class="col-md-7">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-dark text-white">
+          <i class="bi bi-dash-circle"></i> Registrar Egreso
+        </div>
+        <div class="card-body">
+          <div class="mb-3">
+            <input
+              type="text"
+              id="egreso-descripcion"
+              class="form-control"
+              placeholder="Descripción del gasto (ej: Compra de leche)"
+            />
+          </div>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input
+              type="number"
+              id="egreso-monto"
+              class="form-control"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+            />
+            <button class="btn btn-dark" onclick="registrarEgreso()">
+              <i class="bi bi-plus-circle"></i> Registrar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- HISTORIAL DE EGRESOS -->
+      <div class="card shadow-sm">
+        <div class="card-header">
+          <i class="bi bi-list-ul"></i> Egresos del Día
+        </div>
+        <div class="card-body p-0">
+          <div id="lista-egresos" class="list-group list-group-flush">
+            <p class="text-muted text-center py-3 mb-0">
+              Sin egresos registrados
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CUADRE FINAL -->
+<div class="modal fade" id="modal-cuadre" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-dark text-white">
+        <h5 class="modal-title">📊 Cuadre de Caja</h5>
+      </div>
+      <div class="modal-body" id="contenido-cuadre"></div>
+      <div class="modal-footer">
+        <button class="btn btn-success w-100" onclick="location.reload()">
+          <i class="bi bi-check-circle"></i> Aceptar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Botón historial (visible siempre) -->
+<div class="row mt-4">
+    <div class="col">
+        <button class="btn btn-outline-dark"
+                data-bs-toggle="modal"
+                data-bs-target="#modal-historial">
+            <i class="bi bi-clock-history"></i> Ver Historial de Cajas
+        </button>
+    </div>
+</div>
+
+<!-- MODAL HISTORIAL -->
+<div class="modal fade" id="modal-historial" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock-history"></i> Historial de Cajas (últimos 30 días)
+                </h5>
+                <button type="button" class="btn-close btn-close-white"
+                        data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="tabla-historial-caja"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/caja.js') }}"></script>
+{% endblock %}

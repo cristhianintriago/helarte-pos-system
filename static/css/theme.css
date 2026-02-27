@@ -1,0 +1,373 @@
+/* ===== IMPORTAR FUENTE ===== */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;700&display=swap');
+
+/* ===== VARIABLES DE COLOR ===== */
+:root {
+    --helarte-rosa:    #E91E8C;
+    --helarte-cafe:    #3E1F0D;
+    --helarte-cyan:    #00BCD4;
+    --helarte-crema:   #FFF8F9;
+    --helarte-rosa-light: #fce4f3;
+    --helarte-gris:    #f5f5f5;
+    --helarte-texto:   #2d2d2d;
+    --helarte-sombra:  0 4px 20px rgba(233, 30, 140, 0.08);
+    --radio:           14px;
+    --transicion:      all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ===== BASE ===== */
+* {
+    font-family: 'Open Sans', sans-serif;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--helarte-crema);
+    color: var(--helarte-texto);
+}
+
+/* ===== NAVBAR ===== */
+.navbar {
+    background: linear-gradient(135deg, var(--helarte-cafe) 0%, #5c2e10 100%) !important;
+    box-shadow: 0 2px 20px rgba(62, 31, 13, 0.3);
+    padding: 0.6rem 1rem;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: white !important;
+    letter-spacing: 0.5px;
+}
+
+.navbar-brand img {
+    height: 42px;
+    width: 42px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 2px solid var(--helarte-rosa);
+    transition: var(--transicion);
+}
+
+.navbar-brand img:hover {
+    transform: rotate(10deg) scale(1.1);
+}
+
+.navbar-brand span {
+    color: var(--helarte-cyan);
+}
+
+.nav-link {
+    color: rgba(255,255,255,0.85) !important;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 0.5rem 0.9rem !important;
+    border-radius: 8px;
+    transition: var(--transicion);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.nav-link:hover {
+    background: rgba(233, 30, 140, 0.2) !important;
+    color: white !important;
+    transform: translateY(-1px);
+}
+
+.nav-link.active {
+    background: var(--helarte-rosa) !important;
+    color: white !important;
+}
+
+.nav-link.text-danger {
+    color: #ff6b9d !important;
+}
+
+.nav-link.text-danger:hover {
+    background: rgba(255, 107, 157, 0.2) !important;
+}
+
+/* ===== CONTENIDO PRINCIPAL ===== */
+.main-content {
+    padding: 2rem 1.5rem;
+    animation: fadeInUp 0.4s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ===== CARDS ===== */
+.card {
+    border: none !important;
+    border-radius: var(--radio) !important;
+    box-shadow: var(--helarte-sombra) !important;
+    transition: var(--transicion);
+    overflow: hidden;
+}
+
+.card:hover {
+    box-shadow: 0 8px 30px rgba(233, 30, 140, 0.15) !important;
+    transform: translateY(-2px);
+}
+
+.card-header {
+    border-bottom: none !important;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0.9rem 1.2rem;
+}
+
+.card-header.bg-dark {
+    background: linear-gradient(135deg, var(--helarte-cafe), #5c2e10) !important;
+}
+
+.card-header.bg-success {
+    background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+}
+
+.card-header.bg-danger {
+    background: linear-gradient(135deg, var(--helarte-rosa), #c0106e) !important;
+}
+
+/* ===== BOTONES ===== */
+.btn {
+    border-radius: 10px !important;
+    font-weight: 600;
+    font-size: 0.88rem;
+    padding: 0.5rem 1.1rem;
+    transition: var(--transicion);
+    letter-spacing: 0.3px;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+.btn:active {
+    transform: translateY(0px);
+}
+
+.btn-dark {
+    background: linear-gradient(135deg, var(--helarte-cafe), #5c2e10) !important;
+    border: none !important;
+    color: white !important;
+}
+
+.btn-dark:hover {
+    background: linear-gradient(135deg, #5c2e10, var(--helarte-cafe)) !important;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+    border: none !important;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, var(--helarte-rosa), #c0106e) !important;
+    border: none !important;
+}
+
+.btn-outline-dark {
+    border: 2px solid var(--helarte-cafe) !important;
+    color: var(--helarte-cafe) !important;
+    background: transparent !important;
+}
+
+.btn-outline-dark:hover {
+    background: var(--helarte-cafe) !important;
+    color: white !important;
+}
+
+.btn-outline-danger {
+    border: 2px solid var(--helarte-rosa) !important;
+    color: var(--helarte-rosa) !important;
+}
+
+.btn-outline-danger:hover {
+    background: var(--helarte-rosa) !important;
+    color: white !important;
+}
+
+/* ===== FORMULARIOS ===== */
+.form-control, .form-select {
+    border-radius: 10px !important;
+    border: 1.5px solid #e0d6d6 !important;
+    font-size: 0.9rem;
+    padding: 0.55rem 0.9rem;
+    transition: var(--transicion);
+    background-color: white;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--helarte-rosa) !important;
+    box-shadow: 0 0 0 3px rgba(233, 30, 140, 0.12) !important;
+}
+
+.input-group-text {
+    border-radius: 10px 0 0 10px !important;
+    border: 1.5px solid #e0d6d6 !important;
+    background: var(--helarte-rosa-light);
+    color: var(--helarte-rosa);
+    font-weight: 700;
+}
+
+/* ===== BADGES ===== */
+.badge {
+    border-radius: 8px !important;
+    font-weight: 600;
+    font-size: 0.78rem;
+    padding: 0.35em 0.7em;
+}
+
+.badge.bg-dark {
+    background: var(--helarte-cafe) !important;
+}
+
+/* ===== TABLAS ===== */
+.table {
+    font-size: 0.9rem;
+}
+
+.table-dark th {
+    background: linear-gradient(135deg, var(--helarte-cafe), #5c2e10) !important;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+}
+
+.table-hover tbody tr {
+    transition: var(--transicion);
+}
+
+.table-hover tbody tr:hover {
+    background: var(--helarte-rosa-light) !important;
+}
+
+/* ===== MODALES ===== */
+.modal-content {
+    border-radius: var(--radio) !important;
+    border: none !important;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+    animation: modalEntrada 0.3s ease;
+}
+
+@keyframes modalEntrada {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.modal-header.bg-dark {
+    background: linear-gradient(135deg, var(--helarte-cafe), #5c2e10) !important;
+    border-radius: var(--radio) var(--radio) 0 0 !important;
+}
+
+/* ===== PRODUCTOS (tarjetas del menú) ===== */
+.producto-card {
+    cursor: pointer;
+    border-radius: var(--radio) !important;
+    transition: var(--transicion);
+    border: 2px solid transparent !important;
+    background: white !important;
+}
+
+.producto-card:hover {
+    border-color: var(--helarte-rosa) !important;
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(233, 30, 140, 0.2) !important;
+}
+
+.producto-card.agotado {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(50%);
+}
+
+/* ===== LIST GROUP ===== */
+.list-group-item {
+    border-color: #f0e8e8 !important;
+    transition: var(--transicion);
+    font-size: 0.9rem;
+}
+
+.list-group-item:hover {
+    background: var(--helarte-rosa-light) !important;
+}
+
+/* ===== TÍTULOS DE SECCIÓN ===== */
+h4 {
+    font-weight: 700;
+    color: var(--helarte-cafe);
+    font-size: 1.3rem;
+}
+
+/* ===== TOAST ===== */
+.toast-container .toast {
+    border-radius: 12px !important;
+    font-weight: 600;
+    font-size: 0.88rem;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    animation: toastEntrada 0.3s ease;
+}
+
+@keyframes toastEntrada {
+    from {
+        opacity: 0;
+        transform: translateX(40px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* ===== SCROLLBAR PERSONALIZADA ===== */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--helarte-crema);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--helarte-rosa);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #c0106e;
+}
+
+/* ===== BADGE DE ROL EN NAVBAR ===== */
+.badge-rol {
+    background: rgba(233, 30, 140, 0.2);
+    color: #ff9ed6;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 600;
+}
+
+/* ===== ANIMACIÓN STAGGER PARA LISTAS ===== */
+.list-group-item,
+.card {
+    animation: fadeInUp 0.35s ease both;
+}

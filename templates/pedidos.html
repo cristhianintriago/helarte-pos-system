@@ -1,0 +1,110 @@
+{% extends "base.html" %} {% block titulo %}Toma de Pedidos{% endblock %} {%
+block contenido %}
+<div class="row">
+  <!-- COLUMNA IZQUIERDA: Carta de productos -->
+  <div class="col-lg-7 mb-4">
+    <h4 class="mb-3"><i class="bi bi-grid"></i> Carta de Productos</h4>
+
+    <!-- Filtro por categoría -->
+    <div id="filtros" class="mb-3 d-flex flex-wrap gap-2">
+      <button
+        class="btn btn-sm btn-dark filtro-btn activo"
+        onclick="filtrarCategoria('todas')"
+      >
+        Todas
+      </button>
+      <!-- Los botones de categoría se generan dinámicamente desde JS -->
+    </div>
+
+    <!-- Aquí aparecen las tarjetas de productos -->
+    <div id="lista-productos" class="row g-3"></div>
+  </div>
+
+  <!-- COLUMNA DERECHA: Resumen del pedido actual -->
+  <div class="col-lg-5">
+    <div class="card shadow-sm sticky-top" style="top: 80px">
+      <div class="card-header bg-dark text-white">
+        <h5 class="mb-0"><i class="bi bi-receipt"></i> Pedido Actual</h5>
+      </div>
+      <div class="card-body">
+        <!-- Tipo de pedido -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">Tipo de Pedido</label>
+          <div class="d-flex gap-2">
+            <button
+              id="btn-local"
+              class="btn btn-dark flex-fill"
+              onclick="setTipo('local')"
+            >
+              <i class="bi bi-shop"></i> Local
+            </button>
+            <button
+              id="btn-delivery"
+              class="btn btn-outline-dark flex-fill"
+              onclick="setTipo('delivery')"
+            >
+              <i class="bi bi-bicycle"></i> Delivery
+            </button>
+          </div>
+        </div>
+
+        <!-- Datos del cliente -->
+        <div class="mb-3">
+          <input
+            type="text"
+            id="cliente-nombre"
+            class="form-control mb-2"
+            placeholder="Nombre del cliente *"
+          />
+          <!-- Estos campos solo aparecen si es delivery -->
+          <div id="campos-delivery" style="display: none">
+            <input
+              type="text"
+              id="cliente-telefono"
+              class="form-control mb-2"
+              placeholder="Teléfono"
+            />
+            <input
+              type="text"
+              id="cliente-direccion"
+              class="form-control"
+              placeholder="Dirección"
+            />
+          </div>
+        </div>
+
+        <!-- Lista de productos agregados al pedido -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">Productos en el pedido</label>
+          <div id="items-pedido" class="list-group list-group-flush">
+            <p class="text-muted small" id="pedido-vacio">
+              No hay productos aún
+            </p>
+          </div>
+        </div>
+
+        <!-- Total -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="fw-bold fs-5">Total:</span>
+          <span id="total-pedido" class="fw-bold fs-5 text-success">$0.00</span>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-outline-danger flex-fill"
+            onclick="limpiarPedido()"
+          >
+            <i class="bi bi-trash"></i> Limpiar
+          </button>
+          <button class="btn btn-success flex-fill" onclick="confirmarPedido()">
+            <i class="bi bi-check-circle"></i> Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script src="{{ url_for('static', filename='js/pedidos.js') }}"></script>
+{% endblock %}
