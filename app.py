@@ -146,33 +146,6 @@ def usuarios():
         return redirect(url_for('index'))
     return render_template('usuarios.html')
 
-@app.route('/importar-productos', methods=['GET'])
-def importar_productos():
-    import json, os
-    from models.models import Producto
-
-    archivo = os.path.join(os.path.dirname(__file__), 'productos_backup.json')
-    if not os.path.exists(archivo):
-        return jsonify({'error': 'No se encontró productos_backup.json'}), 404
-
-    with open(archivo, 'r', encoding='utf-8') as f:
-        productos = json.load(f)
-
-    count = 0
-    for p in productos:
-        if not Producto.query.filter_by(nombre=p['nombre']).first():
-            nuevo = Producto(
-                nombre=p['nombre'],
-                precio=p['precio'],
-                categoria=p['categoria'],
-                disponible=p['disponible']
-            )
-            db.session.add(nuevo)
-            count += 1
-
-    db.session.commit()
-    return jsonify({'mensaje': f'{count} productos importados ✅'})
-
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
