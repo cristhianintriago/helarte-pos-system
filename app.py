@@ -1,3 +1,5 @@
+from dotenv import load_dotenv
+load_dotenv()  # Carga las variables del .env
 from flask import Flask, redirect, render_template, jsonify, url_for
 from flask_login import LoginManager, login_required, current_user
 from models.models import db
