@@ -1,0 +1,386 @@
+[
+  {
+    "nombre": "Cono Simple",
+    "precio": 1.0,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Copa Simple",
+    "precio": 2.5,
+    "categoria": "Copas",
+    "disponible": true
+  },
+  {
+    "nombre": "Milk Shake",
+    "precio": 2.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Ensalada Helarte Simple",
+    "precio": 3.5,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Durazno Helarte",
+    "precio": 4.0,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Cono Doble",
+    "precio": 1.25,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Tulipan Simple",
+    "precio": 2.5,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Pastel + Helado",
+    "precio": 1.5,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Ensalada Light",
+    "precio": 3.5,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Espumilla",
+    "precio": 1.75,
+    "categoria": "Copas",
+    "disponible": true
+  },
+  {
+    "nombre": "Ensalada Helarte Doble",
+    "precio": 3.75,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frutilla Helarte",
+    "precio": 3.75,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Mini Tulipan Helarte",
+    "precio": 1.75,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Mega Helarte",
+    "precio": 4.75,
+    "categoria": "Copas",
+    "disponible": true
+  },
+  {
+    "nombre": "Obra Helarte",
+    "precio": 7.25,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Crepe Helarte",
+    "precio": 3.0,
+    "categoria": "Copas",
+    "disponible": true
+  },
+  {
+    "nombre": "Mini Helarte",
+    "precio": 1.25,
+    "categoria": "Copas",
+    "disponible": true
+  },
+  {
+    "nombre": "Oblea Helarte",
+    "precio": 2.25,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Tulipan Helarte",
+    "precio": 3.0,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Banana Helarte",
+    "precio": 3.75,
+    "categoria": "Ensaladas",
+    "disponible": true
+  },
+  {
+    "nombre": "Waffle Helarte",
+    "precio": 4.5,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Copa Helarte",
+    "precio": 3.0,
+    "categoria": "Copas",
+    "disponible": true
+  },
+  {
+    "nombre": "Oblea Simple",
+    "precio": 1.5,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Capuchino Grande",
+    "precio": 4.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Capuchino Mediano",
+    "precio": 3.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappé de Oreo Grande",
+    "precio": 4.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappé de Oreo Mediano",
+    "precio": 3.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappé de Fresa Grande",
+    "precio": 4.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappé de Fresa Mediano",
+    "precio": 3.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappé de Chocolate Grande",
+    "precio": 3.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappé de Chocolate Mediano",
+    "precio": 3.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappuchino Grande",
+    "precio": 4.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Frappuchino Mediano",
+    "precio": 3.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Helado en Cono Soft",
+    "precio": 0.5,
+    "categoria": "Conos",
+    "disponible": true
+  },
+  {
+    "nombre": "Sundae Oreo",
+    "precio": 1.5,
+    "categoria": "Sundae",
+    "disponible": true
+  },
+  {
+    "nombre": "Sundae Manicho",
+    "precio": 1.5,
+    "categoria": "Sundae",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón de la casa",
+    "precio": 5.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "El bien mojadito",
+    "precio": 3.5,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "El tradicional costeño",
+    "precio": 3.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "El rapidito",
+    "precio": 3.5,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Canoa Helarte",
+    "precio": 5.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Tigrillo Costeño",
+    "precio": 5.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón Manaba",
+    "precio": 5.5,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Tigrillo mar y tierra",
+    "precio": 6.5,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Súper bolón de queso",
+    "precio": 2.25,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón de verde solo",
+    "precio": 1.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón de queso",
+    "precio": 1.25,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón de chicharron",
+    "precio": 1.5,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón mixto",
+    "precio": 1.75,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Bolón trío",
+    "precio": 2.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Humita frita + Café",
+    "precio": 2.75,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Humita + Café",
+    "precio": 2.25,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Tamal de pollo + Café",
+    "precio": 2.75,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Tamal de chancho + Café",
+    "precio": 2.75,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Quimbolito",
+    "precio": 1.5,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Sanduche caliente doble",
+    "precio": 2.0,
+    "categoria": "Cafeteria",
+    "disponible": true
+  },
+  {
+    "nombre": "Jugo de tomate arbol",
+    "precio": 1.25,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Jugo de mora",
+    "precio": 1.25,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Jugo de naranja",
+    "precio": 1.25,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Café",
+    "precio": 1.0,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Taza de leche",
+    "precio": 1.0,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Café con leche",
+    "precio": 1.25,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Capuchino",
+    "precio": 1.5,
+    "categoria": "Bebidas",
+    "disponible": true
+  },
+  {
+    "nombre": "Mocachino",
+    "precio": 1.75,
+    "categoria": "Bebidas",
+    "disponible": true
+  }
+]
