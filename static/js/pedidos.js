@@ -4,10 +4,15 @@ let pedidoActual = {
     productos: []  // [{producto_id, nombre, precio, cantidad}]
 };
 
+// ── NUEVO: forma de pago por defecto
+let formaPagoActual = 'efectivo';
+
+
 // Al cargar la página traemos los productos de la API
 document.addEventListener('DOMContentLoaded', () => {
     cargarProductos();
 });
+
 
 async function cargarProductos() {
     const respuesta = await fetch('/productos/');
@@ -16,6 +21,7 @@ async function cargarProductos() {
     renderizarFiltros(productos);
     renderizarProductos(productos);
 }
+
 
 function renderizarFiltros(productos) {
     const categorias = [...new Set(productos.map(p => p.categoria))];
@@ -29,6 +35,7 @@ function renderizarFiltros(productos) {
         contenedor.appendChild(btn);
     });
 }
+
 
 function renderizarProductos(productos) {
     const contenedor = document.getElementById('lista-productos');
@@ -51,6 +58,7 @@ function renderizarProductos(productos) {
     });
 }
 
+
 function filtrarCategoria(categoria) {
     document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('activo'));
     event.target.classList.add('activo');
@@ -65,6 +73,7 @@ function filtrarCategoria(categoria) {
         });
 }
 
+
 function agregarProducto(id, nombre, precio) {
     const existente = pedidoActual.productos.find(p => p.producto_id === id);
     if (existente) {
@@ -74,6 +83,7 @@ function agregarProducto(id, nombre, precio) {
     }
     actualizarResumen();
 }
+
 
 function actualizarResumen() {
     const contenedor = document.getElementById('items-pedido');
@@ -110,6 +120,7 @@ function actualizarResumen() {
     document.getElementById('total-pedido').textContent = `$${total.toFixed(2)}`;
 }
 
+
 function quitarProducto(id) {
     const item = pedidoActual.productos.find(p => p.producto_id === id);
     if (item.cantidad > 1) {
@@ -120,6 +131,7 @@ function quitarProducto(id) {
     actualizarResumen();
 }
 
+
 function setTipo(tipo) {
     pedidoActual.tipo = tipo;
     document.getElementById('campos-delivery').style.display = tipo === 'delivery' ? 'block' : 'none';
@@ -127,13 +139,28 @@ function setTipo(tipo) {
     document.getElementById('btn-delivery').className = `btn flex-fill ${tipo === 'delivery' ? 'btn-dark' : 'btn-outline-dark'}`;
 }
 
+
+// ── NUEVO: setFormaPago con botones activos
+function setFormaPago(forma) {
+    formaPagoActual = forma;
+    ['efectivo', 'transferencia', 'mixto'].forEach(f => {
+        const btn = document.getElementById(`btn-${f}`);
+        btn.className = `btn flex-fill ${f === forma ? 'btn-dark' : 'btn-outline-dark'}`;
+    });
+}
+
+
 function limpiarPedido() {
     pedidoActual.productos = [];
-    document.getElementById('cliente-nombre').value = '';
+    // ── NUEVO: restaura nombre por defecto al limpiar
+    document.getElementById('cliente-nombre').value = 'Consumidor final';
     document.getElementById('cliente-telefono').value = '';
     document.getElementById('cliente-direccion').value = '';
+    // ── NUEVO: restaura forma de pago a efectivo
+    setFormaPago('efectivo');
     actualizarResumen();
 }
+
 
 async function confirmarPedido() {
     const nombre = document.getElementById('cliente-nombre').value.trim();
@@ -149,9 +176,10 @@ async function confirmarPedido() {
 
     const datos = {
         tipo: pedidoActual.tipo,
-        cliente_nombre: nombre,
+        cliente_nombre: nombre || 'Consumidor final',
         cliente_telefono: document.getElementById('cliente-telefono').value || null,
         cliente_direccion: document.getElementById('cliente-direccion').value || null,
+        forma_pago: formaPagoActual,  // ── NUEVO
         productos: pedidoActual.productos.map(p => ({
             producto_id: p.producto_id,
             cantidad: p.cantidad

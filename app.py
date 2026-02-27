@@ -1,5 +1,5 @@
-from flask import Flask, redirect, render_template
-from flask_login import LoginManager, login_required
+from flask import Flask, redirect, render_template, jsonify, url_for
+from flask_login import LoginManager, login_required, current_user
 from models.models import db
 from models.usuario import Usuario
 from routes.productos import productos_bp
@@ -8,10 +8,10 @@ from routes.caja import caja_bp
 from routes.ventas import ventas_bp
 from routes.reportes import reportes_bp
 from routes.auth import auth_bp
-import hashlib
-from flask_login import LoginManager, login_required, current_user
 from routes.reporte_diario import reporte_diario_bp
-
+from routes.usuarios import usuarios_bp
+import hashlib
+from datetime import date
 
 
 app = Flask(__name__)
@@ -19,20 +19,24 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helarte.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.secret_key = 'helarte_secret_key'
 
-# Configuración de Flask-Login
+
+# ── Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
-login_manager.login_view = 'auth.login'          # Redirige aquí si no está logueado
+login_manager.login_view = 'auth.login'
 login_manager.login_message = 'Inicia sesión para continuar'
 login_manager.login_message_category = 'warning'
+
 
 @login_manager.user_loader
 def load_user(user_id):
     return Usuario.query.get(int(user_id))
 
+
 db.init_app(app)
 
-# Blueprints
+
+# ── Blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(productos_bp)
 app.register_blueprint(pedidos_bp)
@@ -40,10 +44,12 @@ app.register_blueprint(caja_bp)
 app.register_blueprint(ventas_bp)
 app.register_blueprint(reportes_bp)
 app.register_blueprint(reporte_diario_bp)
+app.register_blueprint(usuarios_bp)
+
+
 with app.app_context():
     db.create_all()
 
-    # Crea root si no existe
     if not Usuario.query.filter_by(username='root').first():
         root = Usuario(
             username='root',
@@ -54,41 +60,77 @@ with app.app_context():
         db.session.commit()
         print("Usuario root creado → usuario: root | contraseña: root123")
 
-    print("Base de datos lista ✅")     
+    print("Base de datos lista ✅")
 
-# Todas las rutas protegidas con @login_required
+
+# ==========================================
+# RUTAS DE VISTAS
+# ==========================================
+
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', fecha_hoy=date.today().strftime('%d/%m/%Y'))
+
+
+@app.route('/resumen')
+@login_required
+def resumen():
+    from models.models import Pedido, Venta, Caja
+
+    pedidos_activos = Pedido.query.filter(
+        Pedido.estado.in_(['pendiente', 'en_proceso'])
+    ).count()
+
+    ventas_hoy = Venta.query.filter(
+        db.func.date(Venta.fecha) == date.today()
+    ).all()
+
+    total_vendido = sum(v.total for v in ventas_hoy)
+
+    caja = Caja.query.filter(
+        db.func.date(Caja.fecha) == date.today(),
+        Caja.estado == 'abierta'
+    ).first()
+
+    return jsonify({
+        'pedidos_activos': pedidos_activos,
+        'total_ventas': len(ventas_hoy),
+        'total_vendido': float(total_vendido),
+        'caja_abierta': caja is not None,
+        'monto_caja': float(caja.monto_inicial) if caja else 0
+    })
+
 
 @app.route('/pedidos')
 @login_required
 def pedidos():
     return render_template('pedidos.html')
 
+
 @app.route('/ventas')
 @login_required
 def ventas():
     return render_template('ventas.html')
+
 
 @app.route('/caja')
 @login_required
 def caja():
     return render_template('caja.html')
 
+
 @app.route('/productos')
 @login_required
 def productos():
     return render_template('productos.html')
+
 
 @app.route('/reportes')
 @login_required
 def reportes():
     return render_template('reportes.html')
 
-from routes.usuarios import usuarios_bp
-app.register_blueprint(usuarios_bp)
 
 @app.route('/usuarios')
 @login_required
@@ -98,6 +140,5 @@ def usuarios():
     return render_template('usuarios.html')
 
 
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0')

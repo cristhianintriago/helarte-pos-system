@@ -68,6 +68,8 @@ def cerrar_caja():
         'mensaje': 'Caja cerrada correctamente ✅',
         'monto_inicial': caja.monto_inicial,
         'total_ingresos': caja.total_ingresos,
+        'total_efectivo': caja.total_efectivo,
+        'total_transferencia': caja.total_transferencia,
         'total_egresos': caja.total_egresos,
         'monto_final': caja.monto_final
     })
@@ -84,10 +86,11 @@ def estado_caja():
         'estado': 'abierta',
         'monto_inicial': caja.monto_inicial,
         'total_ingresos': caja.total_ingresos,
+        'total_efectivo': caja.total_efectivo,
+        'total_transferencia': caja.total_transferencia,
         'total_egresos': caja.total_egresos,
         'balance_actual': caja.monto_inicial + caja.total_ingresos - caja.total_egresos
     })
-
 
 @caja_bp.route('/egresos', methods=['GET'])
 @login_required

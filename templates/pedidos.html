@@ -27,6 +27,7 @@ block contenido %}
         <h5 class="mb-0"><i class="bi bi-receipt"></i> Pedido Actual</h5>
       </div>
       <div class="card-body">
+
         <!-- Tipo de pedido -->
         <div class="mb-3">
           <label class="form-label fw-bold">Tipo de Pedido</label>
@@ -50,11 +51,13 @@ block contenido %}
 
         <!-- Datos del cliente -->
         <div class="mb-3">
+          <!-- NUEVO: value por defecto "Consumidor final" -->
           <input
             type="text"
             id="cliente-nombre"
             class="form-control mb-2"
-            placeholder="Nombre del cliente *"
+            placeholder="Nombre del cliente"
+            value="Consumidor final"
           />
           <!-- Estos campos solo aparecen si es delivery -->
           <div id="campos-delivery" style="display: none">
@@ -70,6 +73,34 @@ block contenido %}
               class="form-control"
               placeholder="Dirección"
             />
+          </div>
+        </div>
+
+        <!-- NUEVO: Forma de pago -->
+        <div class="mb-3">
+          <label class="form-label fw-bold">Forma de Pago</label>
+          <div class="d-flex gap-2">
+            <button
+              id="btn-efectivo"
+              class="btn btn-dark flex-fill"
+              onclick="setFormaPago('efectivo')"
+            >
+              💵 Efectivo
+            </button>
+            <button
+              id="btn-transferencia"
+              class="btn btn-outline-dark flex-fill"
+              onclick="setFormaPago('transferencia')"
+            >
+              📲 Transferencia
+            </button>
+            <button
+              id="btn-mixto"
+              class="btn btn-outline-dark flex-fill"
+              onclick="setFormaPago('mixto')"
+            >
+              🔀 Mixto
+            </button>
           </div>
         </div>
 
@@ -101,6 +132,7 @@ block contenido %}
             <i class="bi bi-check-circle"></i> Confirmar
           </button>
         </div>
+
       </div>
     </div>
   </div>

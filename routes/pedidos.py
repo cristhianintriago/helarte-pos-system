@@ -2,7 +2,9 @@ from flask import Blueprint, jsonify, request
 from models.models import db, Pedido, DetallePedido, Producto, Venta, Caja
 from datetime import datetime
 
+
 pedidos_bp = Blueprint('pedidos', __name__, url_prefix='/pedidos')
+
 
 
 # ==========================================
@@ -32,11 +34,13 @@ def obtener_pedidos():
             'cliente_direccion': p.cliente_direccion,
             'estado': p.estado,
             'total': p.total,
+            'forma_pago': p.forma_pago,  # ── NUEVO
             'fecha': p.fecha.strftime('%Y-%m-%d %H:%M'),  # Formato legible
             'detalles': detalles
         })
 
     return jsonify(resultado)
+
 
 
 # ==========================================
@@ -49,9 +53,10 @@ def crear_pedido():
     # Creamos el pedido principal
     nuevo_pedido = Pedido(
         tipo=datos['tipo'],
-        cliente_nombre=datos['cliente_nombre'],
+        cliente_nombre=datos.get('cliente_nombre', 'Consumidor final'),  # ── NUEVO: nombre por defecto
         cliente_telefono=datos.get('cliente_telefono'),
-        cliente_direccion=datos.get('cliente_direccion')
+        cliente_direccion=datos.get('cliente_direccion'),
+        forma_pago=datos.get('forma_pago', 'efectivo')  # ── NUEVO: forma de pago
     )
 
     db.session.add(nuevo_pedido)
@@ -83,6 +88,7 @@ def crear_pedido():
     return jsonify({'mensaje': 'Pedido creado correctamente ✅', 'id': nuevo_pedido.id, 'total': total}), 201
 
 
+
 # ==========================================
 # PUT /pedidos/<id>/estado → Cambia el estado del pedido
 # Cuando se marca como 'entregado', genera una Venta automáticamente
@@ -99,7 +105,8 @@ def cambiar_estado(pedido_id):
     if nuevo_estado == 'entregado':
         venta = Venta(
             pedido_id=pedido.id,
-            total=pedido.total
+            total=pedido.total,
+            forma_pago=pedido.forma_pago  # ── NUEVO: copia la forma de pago
         )
         db.session.add(venta)
 
@@ -107,6 +114,16 @@ def cambiar_estado(pedido_id):
         caja_abierta = Caja.query.filter_by(estado='abierta').first()
         if caja_abierta:
             caja_abierta.total_ingresos += pedido.total
+            # ── NUEVO: suma al desglose por forma de pago
+            if pedido.forma_pago == 'efectivo':
+                caja_abierta.total_efectivo += pedido.total
+            elif pedido.forma_pago == 'transferencia':
+                caja_abierta.total_transferencia += pedido.total
+            elif pedido.forma_pago == 'mixto':
+                # Mixto se divide 50/50 entre efectivo y transferencia
+                mitad = pedido.total / 2
+                caja_abierta.total_efectivo += mitad
+                caja_abierta.total_transferencia += mitad
 
     db.session.commit()
     return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado} ✅'})

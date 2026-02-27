@@ -1,97 +1,110 @@
-{% extends "base.html" %} {% block titulo %}Inicio{% endblock %} {% block
-contenido %}
-<div class="row justify-content-center mt-5">
-  <div class="col-md-8 text-center">
-    <div class="mb-4">
-      <span style="font-size: 5rem">🍦</span>
-      <h1 class="fw-bold mt-3">Bienvenida a Helarte</h1>
-      <p class="text-muted fs-5">Sistema de gestión de pedidos y caja</p>
-    </div>
+{% extends "base.html" %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
 
-    <!-- Tarjetas de acceso rápido -->
-    <div class="row g-4 mt-2">
-      <div class="col-6 col-md-3">
-        <a href="/pedidos" class="text-decoration-none">
-          <div class="card shadow-sm h-100 hover-card">
-            <div class="card-body text-center py-4">
-              <div class="fs-1">📋</div>
-              <p class="fw-bold mb-0 mt-2">Pedidos</p>
-            </div>
-          </div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3">
-        <a href="/ventas" class="text-decoration-none">
-          <div class="card shadow-sm h-100 hover-card">
-            <div class="card-body text-center py-4">
-              <div class="fs-1">💰</div>
-              <p class="fw-bold mb-0 mt-2">Ventas</p>
-            </div>
-          </div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3">
-        <a href="/caja" class="text-decoration-none">
-          <div class="card shadow-sm h-100 hover-card">
-            <div class="card-body text-center py-4">
-              <div class="fs-1">🗃️</div>
-              <p class="fw-bold mb-0 mt-2">Caja</p>
-            </div>
-          </div>
-        </a>
-      </div>
-      <div class="col-6 col-md-3">
-        <a href="/productos" class="text-decoration-none">
-          <div class="card shadow-sm h-100 hover-card">
-            <div class="card-body text-center py-4">
-              <div class="fs-1">🍧</div>
-              <p class="fw-bold mb-0 mt-2">Productos</p>
-            </div>
-          </div>
-        </a>
-      </div>
+<div class="row mb-4">
+    <div class="col">
+        <h4><i class="bi bi-house"></i> Bienvenido, {{ current_user.username }} 👋</h4>
+        <p class="text-muted mb-0">Resumen del día — {{ fecha_hoy }}</p>
     </div>
-
-    <!-- Estado de caja en tiempo real -->
-    <div class="card mt-5 shadow-sm">
-      <div class="card-body">
-        <h6 class="text-muted mb-3">Estado actual del sistema</h6>
-        <div class="row text-center" id="estado-sistema">
-          <div class="col-4">
-            <h4 id="stat-pedidos" class="fw-bold">-</h4>
-            <small class="text-muted">Pedidos activos</small>
-          </div>
-          <div class="col-4">
-            <h4 id="stat-ventas" class="fw-bold text-success">-</h4>
-            <small class="text-muted">Ventas hoy</small>
-          </div>
-          <div class="col-4">
-            <h4 id="stat-caja" class="fw-bold">-</h4>
-            <small class="text-muted">Caja</small>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
-{% endblock %} {% block scripts %}
-<script>
-  // Cargamos estadísticas rápidas al inicio
-  document.addEventListener("DOMContentLoaded", async () => {
-    // Pedidos activos
-    const pedidos = await fetch("/pedidos/").then((r) => r.json());
-    document.getElementById("stat-pedidos").textContent = pedidos.length;
 
-    // Ventas del día
-    const ventas = await fetch("/ventas/").then((r) => r.json());
-    document.getElementById("stat-ventas").textContent =
-      `$${ventas.total_vendido.toFixed(2)}`;
+<!-- TARJETAS DE RESUMEN -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="fs-2">🛒</div>
+                <h6 class="text-muted">Pedidos Activos</h6>
+                <h3 id="pedidos-activos" class="fw-bold text-primary">—</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="fs-2">🧾</div>
+                <h6 class="text-muted">Ventas Hoy</h6>
+                <h3 id="total-ventas" class="fw-bold text-dark">—</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="fs-2">💰</div>
+                <h6 class="text-muted">Total Vendido</h6>
+                <h3 id="total-vendido" class="fw-bold text-success">—</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="card text-center shadow-sm h-100">
+            <div class="card-body">
+                <div class="fs-2" id="caja-icono">🔒</div>
+                <h6 class="text-muted">Caja</h6>
+                <h3 id="estado-caja" class="fw-bold">—</h3>
+            </div>
+        </div>
+    </div>
+</div>
 
-    // Estado de caja
-    const caja = await fetch("/caja/estado").then((r) => r.json());
-    const statCaja = document.getElementById("stat-caja");
-    statCaja.textContent =
-      caja.estado === "abierta" ? "🟢 Abierta" : "🔴 Cerrada";
-  });
-</script>
+<!-- ACCESOS DIRECTOS -->
+<div class="row g-3">
+    <div class="col-12">
+        <h6 class="text-muted mb-3"><i class="bi bi-grid"></i> Accesos Rápidos</h6>
+    </div>
+    <div class="col-6 col-md-4">
+        <a href="/pedidos" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+            <div class="card-body py-4">
+                <div class="fs-1">📋</div>
+                <h6 class="mt-2 mb-0">Pedidos</h6>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a href="/ventas" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+            <div class="card-body py-4">
+                <div class="fs-1">📊</div>
+                <h6 class="mt-2 mb-0">Ventas</h6>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a href="/caja" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+            <div class="card-body py-4">
+                <div class="fs-1">💵</div>
+                <h6 class="mt-2 mb-0">Caja</h6>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a href="/productos" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+            <div class="card-body py-4">
+                <div class="fs-1">🍦</div>
+                <h6 class="mt-2 mb-0">Productos</h6>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a href="/reportes" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+            <div class="card-body py-4">
+                <div class="fs-1">📄</div>
+                <h6 class="mt-2 mb-0">Reportes</h6>
+            </div>
+        </a>
+    </div>
+    <div class="col-6 col-md-4">
+        <a href="/usuarios" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+            <div class="card-body py-4">
+                <div class="fs-1">👥</div>
+                <h6 class="mt-2 mb-0">Usuarios</h6>
+            </div>
+        </a>
+    </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/index.js') }}"></script>
 {% endblock %}

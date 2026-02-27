@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', verificarCaja);
 
+
 async function verificarCaja() {
     const respuesta = await fetch('/caja/estado');
     const datos = await respuesta.json();
@@ -11,19 +12,24 @@ async function verificarCaja() {
         divCerrada.style.display = 'none';
         divAbierta.style.display = 'block';
         mostrarCajaAbierta(datos);
-        cargarEgresos(); // ← carga la lista al abrir
+        cargarEgresos();
     } else {
         divCerrada.style.display = 'flex';
         divAbierta.style.display = 'none';
     }
 }
 
+
 function mostrarCajaAbierta(datos) {
     document.getElementById('resumen-inicial').textContent   = `$${datos.monto_inicial.toFixed(2)}`;
-    document.getElementById('resumen-ingresos').textContent = `$${datos.total_ingresos.toFixed(2)}`;
-    document.getElementById('resumen-egresos').textContent  = `$${datos.total_egresos.toFixed(2)}`;
-    document.getElementById('resumen-balance').textContent  = `$${datos.balance_actual.toFixed(2)}`;
+    document.getElementById('resumen-ingresos').textContent  = `$${datos.total_ingresos.toFixed(2)}`;
+    document.getElementById('resumen-egresos').textContent   = `$${datos.total_egresos.toFixed(2)}`;
+    document.getElementById('resumen-balance').textContent   = `$${datos.balance_actual.toFixed(2)}`;
+    // ── NUEVO: desglose por forma de pago
+    document.getElementById('resumen-efectivo').textContent      = `$${(datos.total_efectivo || 0).toFixed(2)}`;
+    document.getElementById('resumen-transferencia').textContent = `$${(datos.total_transferencia || 0).toFixed(2)}`;
 }
+
 
 async function abrirCaja() {
     const monto = parseFloat(document.getElementById('monto-inicial').value);
@@ -47,6 +53,7 @@ async function abrirCaja() {
     }
 }
 
+
 async function registrarEgreso() {
     const descripcion = document.getElementById('egreso-descripcion').value.trim();
     const monto = parseFloat(document.getElementById('egreso-monto').value);
@@ -68,12 +75,13 @@ async function registrarEgreso() {
         document.getElementById('egreso-descripcion').value = '';
         document.getElementById('egreso-monto').value = '';
         mostrarToast('Egreso registrado correctamente', 'success');
-        await verificarCaja();  // ← actualiza balance
-        await cargarEgresos();  // ← recarga la lista
+        await verificarCaja();
+        await cargarEgresos();
     } else {
         mostrarToast(datos.error || 'Error al registrar egreso', 'danger');
     }
 }
+
 
 async function cargarEgresos() {
     const respuesta = await fetch('/caja/egresos');
@@ -90,7 +98,6 @@ async function cargarEgresos() {
         return;
     }
 
-    // ← aquí construye cada fila
     egresos.forEach(e => {
         const div = document.createElement('div');
         div.className = 'list-group-item d-flex justify-content-between align-items-center';
@@ -104,6 +111,7 @@ async function cargarEgresos() {
     });
 }
 
+
 async function cerrarCaja() {
     if (!confirm('¿Estás segura de que deseas cerrar la caja?')) return;
 
@@ -115,6 +123,7 @@ async function cerrarCaja() {
     const datos = await respuesta.json();
 
     if (respuesta.ok) {
+        // ── NUEVO: modal de cuadre con desglose de forma de pago
         const contenido = document.getElementById('contenido-cuadre');
         contenido.innerHTML = `
             <ul class="list-group list-group-flush">
@@ -126,12 +135,20 @@ async function cerrarCaja() {
                     <span>Total ingresos</span>
                     <strong class="text-success">+$${datos.total_ingresos.toFixed(2)}</strong>
                 </li>
+                <li class="list-group-item d-flex justify-content-between ps-4">
+                    <span class="text-muted small">💵 Efectivo</span>
+                    <strong class="text-success small">$${(datos.total_efectivo || 0).toFixed(2)}</strong>
+                </li>
+                <li class="list-group-item d-flex justify-content-between ps-4">
+                    <span class="text-muted small">📲 Transferencia</span>
+                    <strong class="text-info small">$${(datos.total_transferencia || 0).toFixed(2)}</strong>
+                </li>
                 <li class="list-group-item d-flex justify-content-between">
                     <span>Total egresos</span>
                     <strong class="text-danger">-$${datos.total_egresos.toFixed(2)}</strong>
                 </li>
-                <li class="list-group-item d-flex justify-content-between fs-5">
-                    <span><strong>Monto final</strong></span>
+                <li class="list-group-item d-flex justify-content-between fs-5 bg-light">
+                    <span><strong>Monto final en caja</strong></span>
                     <strong class="text-primary">$${datos.monto_final.toFixed(2)}</strong>
                 </li>
             </ul>`;
@@ -140,6 +157,8 @@ async function cerrarCaja() {
         mostrarToast(datos.error, 'danger');
     }
 }
+
+
 // Carga el historial cuando se abre el modal
 document.getElementById('modal-historial')
     ?.addEventListener('show.bs.modal', async () => {
@@ -157,7 +176,6 @@ document.getElementById('modal-historial')
     }
 
     let filas = cajas.map(c => {
-        const balance = c.monto_inicial + c.total_ingresos - c.total_egresos;
         return `
             <tr>
                 <td class="fw-bold">${c.fecha}</td>
