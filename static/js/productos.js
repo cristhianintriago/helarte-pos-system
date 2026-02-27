@@ -1,10 +1,8 @@
-// Guardamos todos los productos para filtrar sin llamar al backend cada vez
 let todosLosProductos = [];
 let idAEliminar = null;
 
 document.addEventListener("DOMContentLoaded", cargarProductos);
 
-// Trae todos los productos del backend
 async function cargarProductos() {
   const respuesta = await fetch("/productos/");
   todosLosProductos = await respuesta.json();
@@ -13,7 +11,6 @@ async function cargarProductos() {
   renderizarTabla(todosLosProductos);
 }
 
-// Crea botones de filtro por categoría
 function renderizarFiltros() {
   const categorias = [...new Set(todosLosProductos.map((p) => p.categoria))];
   const contenedor = document.getElementById("filtros");
@@ -30,22 +27,18 @@ function renderizarFiltros() {
   });
 }
 
-// Filtra la tabla por categoría
 function filtrar(categoria, event) {
-  document
-    .querySelectorAll(".filtro-btn")
+  document.querySelectorAll(".filtro-btn")
     .forEach((b) => b.classList.remove("activo", "btn-dark"));
   event.target.classList.add("activo", "btn-dark");
 
-  const filtrados =
-    categoria === "todas"
-      ? todosLosProductos
-      : todosLosProductos.filter((p) => p.categoria === categoria);
+  const filtrados = categoria === "todas"
+    ? todosLosProductos
+    : todosLosProductos.filter((p) => p.categoria === categoria);
 
   renderizarTabla(filtrados);
 }
 
-// Renderiza la tabla de productos
 function renderizarTabla(productos) {
   const tbody = document.getElementById("tabla-productos");
   tbody.innerHTML = "";
@@ -53,7 +46,7 @@ function renderizarTabla(productos) {
   if (productos.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="5" class="text-center text-muted py-4">
+        <td colspan="6" class="text-center text-muted py-4">
           No hay productos registrados
         </td>
       </tr>`;
@@ -62,11 +55,19 @@ function renderizarTabla(productos) {
 
   productos.forEach((p) => {
     const tr = document.createElement("tr");
+
+    // ── NUEVO: imagen o emoji por defecto
+    const imgHtml = p.imagen_url
+      ? `<img src="${p.imagen_url}" alt="${p.nombre}"
+              style="width:50px; height:50px; object-fit:cover; border-radius:8px;">`
+      : `<span style="font-size:2rem;">🍦</span>`;
+
     tr.innerHTML = `
-      <td class="fw-bold">🍦 ${p.nombre}</td>
-      <td><span class="badge bg-secondary">${p.categoria}</span></td>
-      <td class="text-success fw-bold">$${p.precio.toFixed(2)}</td>
-      <td>
+      <td class="text-center align-middle">${imgHtml}</td>
+      <td class="fw-bold align-middle">${p.nombre}</td>
+      <td class="align-middle"><span class="badge bg-secondary">${p.categoria}</span></td>
+      <td class="text-success fw-bold align-middle">$${p.precio.toFixed(2)}</td>
+      <td class="align-middle">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox"
                  ${p.disponible ? "checked" : ""}
@@ -76,7 +77,7 @@ function renderizarTabla(productos) {
           </label>
         </div>
       </td>
-      <td>
+      <td class="align-middle">
         <button class="btn btn-sm btn-outline-dark me-1" onclick="abrirEditar(${p.id})">
           <i class="bi bi-pencil"></i>
         </button>
@@ -88,12 +89,26 @@ function renderizarTabla(productos) {
   });
 }
 
+// ── NUEVO: preview de imagen antes de subir
+function previewImagen(input) {
+  const preview = document.getElementById('preview-imagen');
+  const img = document.getElementById('img-preview');
+
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.src = e.target.result;
+      preview.style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
 // ==========================================
 // CREAR / EDITAR
 // ==========================================
 
-document
-  .getElementById("modal-producto")
+document.getElementById("modal-producto")
   .addEventListener("show.bs.modal", (e) => {
     if (!e.relatedTarget) return;
     limpiarModal();
@@ -105,6 +120,9 @@ function limpiarModal() {
   document.getElementById("producto-categoria").value = "";
   document.getElementById("producto-precio").value = "";
   document.getElementById("producto-disponible").checked = true;
+  document.getElementById("producto-imagen").value = "";
+  document.getElementById("producto-imagen-url").value = "";
+  document.getElementById("preview-imagen").style.display = "none";
   document.getElementById("modal-titulo").textContent = "Nuevo Producto";
 }
 
@@ -117,24 +135,54 @@ function abrirEditar(id) {
   document.getElementById("producto-categoria").value = producto.categoria;
   document.getElementById("producto-precio").value = producto.precio;
   document.getElementById("producto-disponible").checked = producto.disponible;
+  document.getElementById("producto-imagen-url").value = producto.imagen_url || "";
   document.getElementById("modal-titulo").textContent = "Editar Producto";
+
+  // ── Muestra la imagen actual si tiene
+  if (producto.imagen_url) {
+    document.getElementById("img-preview").src = producto.imagen_url;
+    document.getElementById("preview-imagen").style.display = "block";
+  } else {
+    document.getElementById("preview-imagen").style.display = "none";
+  }
 
   new bootstrap.Modal(document.getElementById("modal-producto")).show();
 }
 
 async function guardarProducto() {
   const id = document.getElementById("producto-id").value;
-  const datos = {
-    nombre: document.getElementById("producto-nombre").value.trim(),
-    categoria: document.getElementById("producto-categoria").value.trim(),
-    precio: parseFloat(document.getElementById("producto-precio").value),
-    disponible: document.getElementById("producto-disponible").checked,
-  };
+  const nombre = document.getElementById("producto-nombre").value.trim();
+  const categoria = document.getElementById("producto-categoria").value.trim();
+  const precio = parseFloat(document.getElementById("producto-precio").value);
+  const disponible = document.getElementById("producto-disponible").checked;
+  const archivoImagen = document.getElementById("producto-imagen").files[0];
 
-  if (!datos.nombre || !datos.categoria || !datos.precio) {
+  if (!nombre || !categoria || !precio) {
     mostrarToast("Completa todos los campos obligatorios", "warning");
     return;
   }
+
+  // ── NUEVO: sube la imagen a Cloudinary si se seleccionó una
+  let imagen_url = document.getElementById("producto-imagen-url").value;
+  if (archivoImagen) {
+    mostrarToast("Subiendo imagen...", "secondary");
+    const formData = new FormData();
+    formData.append("imagen", archivoImagen);
+
+    const uploadResp = await fetch("/productos/upload-imagen", {
+      method: "POST",
+      body: formData
+    });
+    const uploadData = await uploadResp.json();
+
+    if (!uploadResp.ok) {
+      mostrarToast(uploadData.error || "Error al subir imagen", "danger");
+      return;
+    }
+    imagen_url = uploadData.imagen_url;
+  }
+
+  const datos = { nombre, categoria, precio, disponible, imagen_url };
 
   const url = id ? `/productos/${id}` : "/productos/";
   const metodo = id ? "PUT" : "POST";
@@ -170,7 +218,6 @@ function abrirEliminar(id, nombre) {
   new bootstrap.Modal(document.getElementById("modal-eliminar")).show();
 }
 
-// ── CAMBIO: ahora valida si el producto tiene pedidos activos
 async function confirmarEliminar() {
   const respuesta = await fetch(`/productos/${idAEliminar}`, { method: "DELETE" });
   const datos = await respuesta.json();
@@ -181,7 +228,6 @@ async function confirmarEliminar() {
     mostrarToast(datos.mensaje || "Producto eliminado ✅", "success");
     cargarProductos();
   } else {
-    // Muestra el error si tiene pedidos activos
     mostrarToast(datos.error || "No se pudo eliminar el producto", "danger");
   }
 }

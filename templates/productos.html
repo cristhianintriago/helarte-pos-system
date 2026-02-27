@@ -1,15 +1,10 @@
-{% extends "base.html" %} {% block titulo %}Productos{% endblock %} {% block
-contenido %}
+{% extends "base.html" %} {% block titulo %}Productos{% endblock %} {% block contenido %}
 <div class="row mb-4">
   <div class="col">
     <h4><i class="bi bi-grid"></i> Gestión de Productos</h4>
   </div>
   <div class="col-auto">
-    <button
-      class="btn btn-dark"
-      data-bs-toggle="modal"
-      data-bs-target="#modal-producto"
-    >
+    <button class="btn btn-dark" data-bs-toggle="modal" data-bs-target="#modal-producto">
       <i class="bi bi-plus-circle"></i> Nuevo Producto
     </button>
   </div>
@@ -17,10 +12,7 @@ contenido %}
 
 <!-- FILTRO POR CATEGORÍA -->
 <div id="filtros" class="mb-4 d-flex flex-wrap gap-2">
-  <button
-    class="btn btn-sm btn-dark filtro-btn activo"
-    onclick="filtrar('todas', event)"
-  >
+  <button class="btn btn-sm btn-dark filtro-btn activo" onclick="filtrar('todas', event)">
     Todas
   </button>
 </div>
@@ -31,6 +23,7 @@ contenido %}
     <table class="table table-hover mb-0">
       <thead class="table-dark">
         <tr>
+          <th>Imagen</th>
           <th>Producto</th>
           <th>Categoría</th>
           <th>Precio</th>
@@ -49,62 +42,47 @@ contenido %}
     <div class="modal-content">
       <div class="modal-header bg-dark text-white">
         <h5 class="modal-title" id="modal-titulo">Nuevo Producto</h5>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="modal"
-        ></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <!-- Campo oculto para saber si estamos editando -->
         <input type="hidden" id="producto-id" />
+        <input type="hidden" id="producto-imagen-url" />
+
+        <!-- NUEVO: Imagen del producto -->
+        <div class="mb-3 text-center">
+          <div id="preview-imagen" class="mb-2" style="display:none">
+            <img id="img-preview" src="" alt="Preview"
+                 class="rounded" style="width:120px; height:120px; object-fit:cover;">
+          </div>
+          <label class="form-label fw-bold">Imagen del producto</label>
+          <input type="file" id="producto-imagen" class="form-control"
+                 accept="image/*" onchange="previewImagen(this)"/>
+          <small class="text-muted">Opcional · Se recortará en cuadrado 400×400</small>
+        </div>
 
         <div class="mb-3">
           <label class="form-label">Nombre del producto *</label>
-          <input
-            type="text"
-            id="producto-nombre"
-            class="form-control"
-            placeholder="Ej: Copa Oreo"
-          />
+          <input type="text" id="producto-nombre" class="form-control" placeholder="Ej: Copa Oreo"/>
         </div>
         <div class="mb-3">
           <label class="form-label">Categoría *</label>
-          <input
-            type="text"
-            id="producto-categoria"
-            class="form-control"
-            placeholder="Ej: Copa, Sundae, Malteada"
-          />
+          <input type="text" id="producto-categoria" class="form-control" placeholder="Ej: Copa, Sundae, Malteada"/>
         </div>
         <div class="mb-3">
           <label class="form-label">Precio *</label>
           <div class="input-group">
             <span class="input-group-text">$</span>
-            <input
-              type="number"
-              id="producto-precio"
-              class="form-control"
-              placeholder="0.00"
-              step="0.01"
-              min="0"
-            />
+            <input type="number" id="producto-precio" class="form-control"
+                   placeholder="0.00" step="0.01" min="0"/>
           </div>
         </div>
         <div class="form-check">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            id="producto-disponible"
-            checked
-          />
+          <input class="form-check-input" type="checkbox" id="producto-disponible" checked/>
           <label class="form-check-label">Disponible en carta</label>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          Cancelar
-        </button>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button class="btn btn-dark" onclick="guardarProducto()">
           <i class="bi bi-save"></i> Guardar
         </button>
@@ -122,13 +100,10 @@ contenido %}
       </div>
       <div class="modal-body">
         ¿Estás segura de eliminar el producto
-        <strong id="nombre-eliminar"></strong>? Esta acción no se puede
-        deshacer.
+        <strong id="nombre-eliminar"></strong>? Esta acción no se puede deshacer.
       </div>
       <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
-          Cancelar
-        </button>
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button class="btn btn-danger" onclick="confirmarEliminar()">
           <i class="bi bi-trash"></i> Eliminar
         </button>
