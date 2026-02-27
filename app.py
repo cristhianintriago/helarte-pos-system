@@ -11,13 +11,20 @@ from routes.auth import auth_bp
 from routes.reporte_diario import reporte_diario_bp
 from routes.usuarios import usuarios_bp
 import hashlib
+import os
 from datetime import date
 
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///helarte.db'
+
+# ── NUEVO: PostgreSQL en Railway, SQLite local
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///helarte.db')
+if database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.secret_key = 'helarte_secret_key'
+app.secret_key = os.environ.get('SECRET_KEY', 'helarte_secret_key')
 
 
 # ── Flask-Login
@@ -141,4 +148,5 @@ def usuarios():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0')
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
