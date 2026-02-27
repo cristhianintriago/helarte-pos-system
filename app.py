@@ -165,6 +165,18 @@ def limpiar_datos():
     db.session.commit()
     return jsonify({'mensaje': 'Datos limpiados, productos intactos ✅'})
 
+@app.route('/migrar-imagen-url')
+def migrar_imagen_url():
+    try:
+        with db.engine.connect() as conn:
+            conn.execute(db.text(
+                'ALTER TABLE productos ADD COLUMN IF NOT EXISTS imagen_url VARCHAR(500)'
+            ))
+            conn.commit()
+        return jsonify({'mensaje': 'Columna imagen_url agregada ✅'})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
