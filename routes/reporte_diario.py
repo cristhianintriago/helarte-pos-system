@@ -11,6 +11,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
 
+# Blueprint para los reportes diarios
 reporte_diario_bp = Blueprint('reporte_diario', __name__, url_prefix='/reporte-diario')
 
 
@@ -51,8 +52,12 @@ def listar_historial():
 
 
 def generar_pdf_fecha(fecha):
-    """Lógica principal para generar el PDF"""
-    # 1. Obtener datos del día
+    """
+    Lógica principal para estructurar y dibujar el reporte PDF usando la librería ReportLab.
+    Acumula datos de las ventas, cajas, y productos de un día puntual en memoria y luego dibuja las tablas.
+    Los emojis usados aquí forman parte del reporte visual (interfaz con el cliente final).
+    """
+    # 1. Obtener datos del día a procesar configurando el rango de tiempo de horas y minutos.
     inicio_dia = datetime.combine(fecha, datetime.min.time())
     fin_dia = datetime.combine(fecha, datetime.max.time())
 

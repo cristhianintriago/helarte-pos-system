@@ -7,6 +7,11 @@ reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 
 @reportes_bp.route('/', methods=['GET'])
 def obtener_reporte():
+    """
+    Construye las estadísticas que alimentan el Dashboard.
+    Usa el motor de agregación de SQLAlchemy (func.date, func.count, func.sum) 
+    simulando comportamientos nativos de SQL avanzado como 'GROUP BY'.
+    """
     # Recibimos las fechas como parámetros de la URL
     desde_str = request.args.get('desde')
     hasta_str = request.args.get('hasta')

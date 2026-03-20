@@ -9,7 +9,8 @@ usuarios_bp = Blueprint('usuarios', __name__, url_prefix='/usuarios')
 def hashear(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
-# Solo root puede entrar aquí
+# Decorador personalizado: verifica dinámicamente si el usuario actual ('current_user') 
+# tiene o no el rol 'root' requerido, antes de dejarle accesar a la función decorada.
 def solo_root(f):
     from functools import wraps
     @wraps(f)
@@ -60,7 +61,7 @@ def crear():
     db.session.add(nuevo)
     db.session.commit()
 
-    return jsonify({'mensaje': f'Usuario {nuevo.username} creado ✅'}), 201
+    return jsonify({'mensaje': f'Usuario {nuevo.username} creado'}), 201
 
 
 @usuarios_bp.route('/api/<int:usuario_id>', methods=['PUT'])
@@ -81,7 +82,7 @@ def editar(usuario_id):
         usuario.password = hashear(datos['password'])
 
     db.session.commit()
-    return jsonify({'mensaje': 'Usuario actualizado ✅'})
+    return jsonify({'mensaje': 'Usuario actualizado'})
 
 
 @usuarios_bp.route('/api/<int:usuario_id>', methods=['DELETE'])
@@ -98,4 +99,4 @@ def eliminar(usuario_id):
 
     db.session.delete(usuario)
     db.session.commit()
-    return jsonify({'mensaje': 'Usuario eliminado ✅'})
+    return jsonify({'mensaje': 'Usuario eliminado'})

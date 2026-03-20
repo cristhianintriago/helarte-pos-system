@@ -44,10 +44,14 @@ def obtener_pedidos():
 
 
 # ==========================================
-# POST /pedidos/ → Crea un nuevo pedido con sus productos
+# POST /pedidos/ -> Crea un nuevo pedido con sus productos
 # ==========================================
 @pedidos_bp.route('/', methods=['POST'])
 def crear_pedido():
+    """
+    Ruta para la creación de un Pedido en la que recibimos un objeto estructurado en JSON 
+    desde el Frontend, insertamos en BD y iteramos los detalles (productos).
+    """
     datos = request.json
 
     # Creamos el pedido principal
@@ -81,13 +85,11 @@ def crear_pedido():
         )
         db.session.add(detalle)
 
-    # Actualizamos el total del pedido
+    # Actualizamos el total general del pedido a nivel de la cabecera
     nuevo_pedido.total = total
     db.session.commit()
 
-    return jsonify({'mensaje': 'Pedido creado correctamente ✅', 'id': nuevo_pedido.id, 'total': total}), 201
-
-
+    return jsonify({'mensaje': 'Pedido creado correctamente', 'id': nuevo_pedido.id, 'total': total}), 201
 
 # ==========================================
 # PUT /pedidos/<id>/estado → Cambia el estado del pedido
@@ -126,4 +128,4 @@ def cambiar_estado(pedido_id):
                 caja_abierta.total_transferencia += mitad
 
     db.session.commit()
-    return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado} ✅'})
+    return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado}'})

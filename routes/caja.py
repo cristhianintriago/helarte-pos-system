@@ -5,10 +5,13 @@ from datetime import datetime, date
 
 caja_bp = Blueprint('caja', __name__, url_prefix='/caja')
 
-
 @caja_bp.route('/abrir', methods=['POST'])
 @login_required
 def abrir_caja():
+    """ 
+    Permite abrir una nueva caja al inicio de la jornada.
+    Solo puede haber una caja abierta por día.
+    """
     from flask_login import current_user
 
     hoy = date.today()
@@ -24,14 +27,16 @@ def abrir_caja():
                 return jsonify({'error': 'La caja ya fue cerrada hoy. Solo un administrador puede reabrirla'}), 403
             caja_hoy.estado = 'abierta'
             db.session.commit()
-            return jsonify({'mensaje': 'Caja reabierta correctamente ✅'}), 200
+            return jsonify({'mensaje': 'Caja reabierta correctamente'}), 200
 
+    # Extraemos el monto con el cual el usuario abrirá la caja hoy
     datos = request.json
     nueva_caja = Caja(monto_inicial=datos['monto_inicial'])
+    
+    # Preparamos en sesión el objeto y hacemos persistencia (commit) hacia la BD
     db.session.add(nueva_caja)
     db.session.commit()
-    return jsonify({'mensaje': 'Caja abierta correctamente ✅', 'id': nueva_caja.id}), 201
-
+    return jsonify({'mensaje': 'Caja abierta correctamente', 'id': nueva_caja.id}), 201
 
 @caja_bp.route('/egreso', methods=['POST'])
 @login_required
@@ -50,8 +55,7 @@ def registrar_egreso():
 
     db.session.add(egreso)
     db.session.commit()
-    return jsonify({'mensaje': 'Egreso registrado correctamente ✅'})
-
+    return jsonify({'mensaje': 'Egreso registrado correctamente'})
 
 @caja_bp.route('/cerrar', methods=['POST'])
 @login_required
@@ -60,12 +64,13 @@ def cerrar_caja():
     if not caja:
         return jsonify({'error': 'No hay caja abierta'}), 400
 
+    # Calculamos el monto final base 
     caja.monto_final = caja.monto_inicial + caja.total_ingresos - caja.total_egresos
     caja.estado = 'cerrada'
     db.session.commit()
 
     return jsonify({
-        'mensaje': 'Caja cerrada correctamente ✅',
+        'mensaje': 'Caja cerrada correctamente',
         'monto_inicial': caja.monto_inicial,
         'total_ingresos': caja.total_ingresos,
         'total_efectivo': caja.total_efectivo,
@@ -73,7 +78,6 @@ def cerrar_caja():
         'total_egresos': caja.total_egresos,
         'monto_final': caja.monto_final
     })
-
 
 @caja_bp.route('/estado', methods=['GET'])
 @login_required

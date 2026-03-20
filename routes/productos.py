@@ -16,10 +16,14 @@ cloudinary.config(
 
 
 # ==========================================
-# GET /productos/ → Retorna todos los productos
+# GET /productos/ -> Retorna todos los productos
 # ==========================================
 @productos_bp.route('/', methods=['GET'])
 def obtener_productos():
+    """ 
+    Obtiene todos los productos de la base de datos utilizando SQLAlchemy (orm).
+    Retorna un arreglo JSON listo para ser consumido por el frontend.
+    """
     productos = Producto.query.all()
 
     resultado = []
@@ -54,7 +58,7 @@ def crear_producto():
     db.session.add(nuevo_producto)
     db.session.commit()
 
-    return jsonify({'mensaje': 'Producto creado correctamente ✅', 'id': nuevo_producto.id}), 201
+    return jsonify({'mensaje': 'Producto creado correctamente', 'id': nuevo_producto.id}), 201
 
 
 # ==========================================
@@ -98,7 +102,7 @@ def actualizar_producto(producto_id):
     producto.imagen_url = datos.get('imagen_url', producto.imagen_url)  # ── NUEVO
 
     db.session.commit()
-    return jsonify({'mensaje': 'Producto actualizado correctamente ✅'})
+    return jsonify({'mensaje': 'Producto actualizado correctamente'})
 
 
 # ==========================================
@@ -123,4 +127,4 @@ def eliminar_producto(producto_id):
 
     db.session.delete(producto)
     db.session.commit()
-    return jsonify({'mensaje': f'Producto "{producto.nombre}" eliminado ✅'})
+    return jsonify({'mensaje': f'Producto "{producto.nombre}" eliminado'})

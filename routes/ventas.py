@@ -8,6 +8,7 @@ ventas_bp = Blueprint('ventas', __name__, url_prefix='/ventas')
 
 @ventas_bp.route('/', methods=['GET'])
 def obtener_ventas():
+    """ Lista e itera en un ciclo común las ventas del día actual """
     hoy = date.today()
     ventas = Venta.query.filter(
         db.func.date(Venta.fecha) == hoy
