@@ -120,6 +120,16 @@
               </a>
             </li>
             {% endif %}
+            {% if current_user.es_root() %}
+            <li class="nav-item">
+              <a
+                class="nav-link {% if request.path.startswith('/admin') %}active{% endif %}"
+                href="/admin"
+              >
+                <i class="bi bi-shield-lock-fill text-danger"></i> Admin
+              </a>
+            </li>
+            {% endif %}
           </ul>
 
           <!-- Usuario + logout -->

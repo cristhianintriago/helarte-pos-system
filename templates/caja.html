@@ -73,6 +73,14 @@
           <button class="btn btn-danger w-100 mt-4" onclick="cerrarCaja()">
             <i class="bi bi-lock"></i> Cerrar Caja
           </button>
+          <!-- Botón exclusivo para admin/root: reinicia contadores sin borrar el monto inicial -->
+          <div id="seccion-admin" style="display: none;">
+            <hr class="mt-3 mb-2">
+            <small class="text-muted d-block mb-2"><i class="bi bi-shield-lock"></i> Solo administrador</small>
+            <button class="btn btn-outline-warning w-100" onclick="confirmarReiniciarCaja()">
+              <i class="bi bi-arrow-counterclockwise"></i> Reiniciar Caja del Día
+            </button>
+          </div>
         </div>
       </div>
     </div>

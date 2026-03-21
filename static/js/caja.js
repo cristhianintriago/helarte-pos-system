@@ -13,6 +13,10 @@ async function verificarCaja() {
         divAbierta.style.display = 'block';
         mostrarCajaAbierta(datos);
         cargarEgresos();
+
+        // Mostramos la sección admin solo si el usuario tiene permiso
+        const seccionAdmin = document.getElementById('seccion-admin');
+        if (seccionAdmin) seccionAdmin.style.display = datos.is_admin ? 'block' : 'none';
     } else {
         divCerrada.style.display = 'flex';
         divAbierta.style.display = 'none';
@@ -159,7 +163,29 @@ async function cerrarCaja() {
 }
 
 
-// Carga el historial cuando se abre el modal
+async function confirmarReiniciarCaja() {
+    const ok = confirm(
+        '⚠️ ADVERTENCIA\n\n' +
+        'Esta acción reiniciará TODOS los contadores de la caja a cero (ingresos, egresos, efectivo, transferencia), ' +
+        'manteniendo el monto inicial y reabriendo la caja si estaba cerrada.\n\n' +
+        '¿Estás seguro/a de que deseas continuar?'
+    );
+    if (!ok) return;
+
+    const respuesta = await fetch('/caja/reiniciar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    });
+    const datos = await respuesta.json();
+
+    if (respuesta.ok) {
+        mostrarToast(datos.mensaje, 'success');
+        location.reload();
+    } else {
+        mostrarToast(datos.error || 'Error al reiniciar la caja', 'danger');
+    }
+}
+
 document.getElementById('modal-historial')
     ?.addEventListener('show.bs.modal', async () => {
     const respuesta = await fetch('/caja/historial');

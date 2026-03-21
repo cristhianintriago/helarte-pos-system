@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titulo %}Registro de Ventas{% endblock %}
+{% block titulo %}Historial de Ventas{% endblock %}
 {% block contenido %}
 
 <div class="row mb-4">
@@ -48,24 +48,7 @@
     </div>
 </div>
 
-<!-- PEDIDOS ACTIVOS -->
-<div class="row mb-4">
-    <div class="col">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white d-flex justify-content-between">
-                <span><i class="bi bi-clock"></i> Pedidos Activos</span>
-                <button class="btn btn-sm btn-outline-light" onclick="cargarDatos()">
-                    <i class="bi bi-arrow-clockwise"></i> Actualizar
-                </button>
-            </div>
-            <div class="card-body p-0">
-                <div id="lista-pedidos-activos" class="list-group list-group-flush"></div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- VENTAS COMPLETADAS -->
+<!-- VENTAS COMPLETADAS (ya no hay gestión de pedidos activos aquí) -->
 <div class="row">
     <div class="col">
         <div class="card shadow-sm">
@@ -81,5 +64,5 @@
 
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/ventas.js') }}"></script>
+<script src="{{ url_for('static', filename='js/ventas.js') }}?v=2"></script>
 {% endblock %}
