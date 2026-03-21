@@ -37,8 +37,18 @@ async function cargarReporte() {
     return;
   }
 
-  const respuesta = await fetch(`/reportes/?desde=${desde}&hasta=${hasta}`);
-  const datos = await respuesta.json();
+  let datos;
+  try {
+    const respuesta = await fetch(`/reportes/?desde=${desde}&hasta=${hasta}`);
+    if (!respuesta.ok) {
+      throw new Error(`No se pudo generar reporte (HTTP ${respuesta.status})`);
+    }
+    datos = await respuesta.json();
+  } catch (error) {
+    console.error(error);
+    mostrarToast("No se pudo cargar el reporte", "danger");
+    return;
+  }
 
   // Actualizamos tarjetas de resumen
   document.getElementById("rep-pedidos").textContent = datos.total_pedidos;
@@ -92,8 +102,18 @@ async function cargarReporte() {
 }
 
 async function cargarDashboardHoy() {
-  const respuesta = await fetch('/reportes/dashboard-hoy');
-  const datos = await respuesta.json();
+  let datos;
+  try {
+    const respuesta = await fetch('/reportes/dashboard-hoy');
+    if (!respuesta.ok) {
+      throw new Error(`No se pudo cargar dashboard (HTTP ${respuesta.status})`);
+    }
+    datos = await respuesta.json();
+  } catch (error) {
+    console.error(error);
+    mostrarToast('No se pudo cargar el dashboard de hoy', 'danger');
+    return;
+  }
 
   document.getElementById('dash-fecha').textContent = datos.fecha;
   document.getElementById('dash-total-hoy').textContent = `$${datos.total_vendido_hoy.toFixed(2)}`;
@@ -164,8 +184,18 @@ function descargarPDFHoy() {
 
 // Abre el modal y carga el historial
 document.getElementById('modal-historial')?.addEventListener('show.bs.modal', async () => {
+  let historial = [];
+  try {
     const respuesta = await fetch('/reporte-diario/historial');
-    const historial = await respuesta.json();
+    if (!respuesta.ok) {
+      throw new Error(`No se pudo cargar historial (HTTP ${respuesta.status})`);
+    }
+    historial = await respuesta.json();
+  } catch (error) {
+    console.error(error);
+    mostrarToast('No se pudo cargar el historial de reportes', 'danger');
+    return;
+  }
 
     const lista = document.getElementById('lista-historial');
     lista.innerHTML = '';

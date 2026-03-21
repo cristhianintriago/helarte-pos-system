@@ -70,6 +70,15 @@ def crear_producto():
 @productos_bp.route('/upload-imagen', methods=['POST'])
 @login_required
 def upload_imagen():
+    if not all([
+        os.environ.get('CLOUDINARY_CLOUD_NAME'),
+        os.environ.get('CLOUDINARY_API_KEY'),
+        os.environ.get('CLOUDINARY_API_SECRET')
+    ]):
+        return jsonify({
+            'error': 'Cloudinary no esta configurado en el servidor (faltan variables de entorno).'
+        }), 503
+
     if 'imagen' not in request.files:
         return jsonify({'error': 'No se envió ninguna imagen'}), 400
 

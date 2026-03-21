@@ -4,11 +4,20 @@ let idAEliminar = null;
 document.addEventListener("DOMContentLoaded", cargarProductos);
 
 async function cargarProductos() {
-  const respuesta = await fetch("/productos/");
-  todosLosProductos = await respuesta.json();
+  try {
+    const respuesta = await fetch("/productos/");
+    if (!respuesta.ok) {
+      throw new Error(`No se pudo cargar productos (HTTP ${respuesta.status})`);
+    }
 
-  renderizarFiltros();
-  renderizarTabla(todosLosProductos);
+    todosLosProductos = await respuesta.json();
+
+    renderizarFiltros();
+    renderizarTabla(todosLosProductos);
+  } catch (error) {
+    console.error(error);
+    mostrarToast("No se pudieron cargar los productos", "danger");
+  }
 }
 
 function renderizarFiltros() {
@@ -164,48 +173,72 @@ async function guardarProducto() {
 
   // ── NUEVO: sube la imagen a Cloudinary si se seleccionó una
   let imagen_url = document.getElementById("producto-imagen-url").value;
-  if (archivoImagen) {
-    mostrarToast("Subiendo imagen...", "secondary");
-    const formData = new FormData();
-    formData.append("imagen", archivoImagen);
+  try {
+    if (archivoImagen) {
+      mostrarToast("Subiendo imagen...", "secondary");
+      const formData = new FormData();
+      formData.append("imagen", archivoImagen);
 
-    const uploadResp = await fetch("/productos/upload-imagen", {
-      method: "POST",
-      body: formData
-    });
-    const uploadData = await uploadResp.json();
+      const uploadResp = await fetch("/productos/upload-imagen", {
+        method: "POST",
+        body: formData
+      });
+      const uploadData = await uploadResp.json();
 
-    if (!uploadResp.ok) {
-      mostrarToast(uploadData.error || "Error al subir imagen", "danger");
-      return;
+      if (!uploadResp.ok) {
+        mostrarToast(uploadData.error || "Error al subir imagen", "danger");
+        return;
+      }
+      imagen_url = uploadData.imagen_url;
     }
-    imagen_url = uploadData.imagen_url;
+
+    const datos = { nombre, categoria, precio, disponible, imagen_url };
+    const url = id ? `/productos/${id}` : "/productos/";
+    const metodo = id ? "PUT" : "POST";
+
+    const respuesta = await fetch(url, {
+      method: metodo,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datos),
+    });
+
+    let payload = {};
+    try {
+      payload = await respuesta.json();
+    } catch (_) {
+      payload = {};
+    }
+
+    if (!respuesta.ok) {
+      throw new Error(payload.error || `No se pudo guardar el producto (HTTP ${respuesta.status})`);
+    }
+
+    bootstrap.Modal.getInstance(document.getElementById("modal-producto")).hide();
+    mostrarToast(id ? "Producto actualizado ✅" : "Producto creado ✅", "success");
+    cargarProductos();
+  } catch (error) {
+    console.error(error);
+    mostrarToast(error.message || "No se pudo guardar el producto", "danger");
   }
-
-  const datos = { nombre, categoria, precio, disponible, imagen_url };
-
-  const url = id ? `/productos/${id}` : "/productos/";
-  const metodo = id ? "PUT" : "POST";
-
-  await fetch(url, {
-    method: metodo,
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(datos),
-  });
-
-  bootstrap.Modal.getInstance(document.getElementById("modal-producto")).hide();
-  mostrarToast(id ? "Producto actualizado ✅" : "Producto creado ✅", "success");
-  cargarProductos();
 }
 
 async function toggleDisponible(id, disponible) {
   const producto = todosLosProductos.find((p) => p.id === id);
-  await fetch(`/productos/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...producto, disponible }),
-  });
-  cargarProductos();
+  try {
+    const respuesta = await fetch(`/productos/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...producto, disponible }),
+    });
+
+    if (!respuesta.ok) {
+      throw new Error(`No se pudo actualizar disponibilidad (HTTP ${respuesta.status})`);
+    }
+    cargarProductos();
+  } catch (error) {
+    console.error(error);
+    mostrarToast("No se pudo actualizar disponibilidad", "danger");
+  }
 }
 
 // ==========================================
