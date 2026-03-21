@@ -228,15 +228,12 @@ def crear_pedido():
 
     db.session.commit()
 
-    # Genera y guarda automáticamente el ticket al confirmar el pedido.
-    ticket_path = _guardar_ticket_pdf(nuevo_pedido)
-
     return jsonify({
         'mensaje': 'Pedido creado correctamente',
         'id': nuevo_pedido.id,
         'total': total,
         'ticket_url': f'/pedidos/{nuevo_pedido.id}/ticket',
-        'ticket_guardado': bool(ticket_path),
+        'ticket_guardado': False,
     }), 201
 
 # ==========================================
@@ -278,6 +275,25 @@ def cambiar_estado(pedido_id):
 
     db.session.commit()
     return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado}'})
+
+
+@pedidos_bp.route('/<int:pedido_id>', methods=['DELETE'])
+def eliminar_pedido(pedido_id):
+    """Elimina un pedido activo cuando el cliente cancela la orden."""
+    pedido = Pedido.query.get_or_404(pedido_id)
+
+    if pedido.estado == 'entregado':
+        return jsonify({'error': 'No se puede eliminar un pedido ya entregado'}), 400
+
+    venta_asociada = Venta.query.filter_by(pedido_id=pedido.id).first()
+    if venta_asociada:
+        return jsonify({'error': 'No se puede eliminar un pedido con venta registrada'}), 400
+
+    DetallePedido.query.filter_by(pedido_id=pedido.id).delete()
+    db.session.delete(pedido)
+    db.session.commit()
+
+    return jsonify({'mensaje': 'Pedido eliminado correctamente'})
 
 
 @pedidos_bp.route('/<int:pedido_id>/ticket', methods=['GET'])
