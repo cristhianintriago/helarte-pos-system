@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request, send_file
-from models.models import db, Pedido, DetallePedido, Producto, Venta, Caja
+from flask_login import login_required, current_user
+from models.models import db, Pedido, DetallePedido, Producto, Venta, Caja, ConfiguracionSistema
 from datetime import datetime
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
@@ -12,6 +13,39 @@ import os
 
 
 pedidos_bp = Blueprint('pedidos', __name__, url_prefix='/pedidos')
+
+
+def _calcular_siguiente_numero_pedido():
+    config = _obtener_o_inicializar_contador_tickets()
+    return int(config.valor_entero or 1)
+
+
+def _obtener_o_inicializar_contador_tickets():
+    config = ConfiguracionSistema.query.filter_by(clave='contador_ticket_diario').first()
+    if config and config.valor_entero and 1 <= int(config.valor_entero) <= 50:
+        return config
+
+    if not config:
+        config = ConfiguracionSistema(clave='contador_ticket_diario', valor_entero=1)
+    else:
+        config.valor_entero = 1
+
+    db.session.add(config)
+    db.session.flush()
+    return config
+
+
+def _avanzar_contador_tickets():
+    config = _obtener_o_inicializar_contador_tickets()
+    actual = int(config.valor_entero or 1)
+    config.valor_entero = (actual % 50) + 1
+    db.session.add(config)
+
+
+def _numero_visual_pedido(pedido):
+    if pedido.numero_pedido and pedido.numero_pedido > 0:
+        return int(pedido.numero_pedido)
+    return 0
 
 
 def _obtener_ticket_path(pedido_id):
@@ -61,12 +95,14 @@ def _construir_ticket_pdf(pedido):
     elementos.append(Paragraph('Ticket de Pedido', sub_style))
 
     encabezado = [
-        ['Ticket #', f'{pedido.id}'],
+        ['Ticket #', f'{_numero_visual_pedido(pedido)}'],
         ['Fecha', pedido.fecha.strftime('%d/%m/%Y %H:%M')],
         ['Cliente', pedido.cliente_nombre or 'Consumidor final'],
         ['Tipo', pedido.tipo.title()],
         ['Pago', pedido.forma_pago.title()],
     ]
+    if pedido.tipo == 'delivery' and pedido.plataforma:
+        encabezado.append(['Plataforma', pedido.plataforma])
     if pedido.numero_comprobante:
         encabezado.append(['Comprobante', pedido.numero_comprobante])
 
@@ -84,8 +120,12 @@ def _construir_ticket_pdf(pedido):
 
     data_items = [['Producto', 'Cant.', 'P. Unit.', 'Subtotal']]
     for d in pedido.detalles:
+        nombre_producto = d.producto.nombre
+        if d.sabor:
+            nombre_producto = f"{nombre_producto} ({d.sabor})"
+
         data_items.append([
-            d.producto.nombre,
+            nombre_producto,
             str(d.cantidad),
             f"${float(d.subtotal) / float(d.cantidad):.2f}",
             f"${float(d.subtotal):.2f}",
@@ -130,7 +170,7 @@ def _guardar_ticket_pdf(pedido):
 @pedidos_bp.route('/', methods=['GET'])
 def obtener_pedidos():
     # Solo mostramos pedidos que NO están entregados aún
-    pedidos = Pedido.query.filter(Pedido.estado != 'entregado').all()
+    pedidos = Pedido.query.filter(Pedido.estado != 'entregado').order_by(Pedido.id.desc()).all()
 
     resultado = []
     for p in pedidos:
@@ -139,16 +179,19 @@ def obtener_pedidos():
         for d in p.detalles:
             detalles.append({
                 'producto': d.producto.nombre,
+                'sabor': d.sabor,
                 'cantidad': d.cantidad,
                 'subtotal': d.subtotal
             })
 
         resultado.append({
             'id': p.id,
+            'numero_pedido': _numero_visual_pedido(p),
             'tipo': p.tipo,
             'cliente_nombre': p.cliente_nombre,
             'cliente_telefono': p.cliente_telefono,
             'cliente_direccion': p.cliente_direccion,
+            'plataforma': p.plataforma,
             'estado': p.estado,
             'total': p.total,
             'forma_pago': p.forma_pago,
@@ -185,6 +228,8 @@ def crear_pedido():
         cliente_nombre=datos.get('cliente_nombre', 'Consumidor final'),
         cliente_telefono=datos.get('cliente_telefono'),
         cliente_direccion=datos.get('cliente_direccion'),
+        plataforma=datos.get('plataforma'),
+        numero_pedido=_calcular_siguiente_numero_pedido(),
         forma_pago=forma_pago,
         numero_comprobante=datos.get('numero_comprobante'),
         monto_efectivo=float(datos.get('monto_efectivo') or 0.0),
@@ -202,6 +247,30 @@ def crear_pedido():
         if not producto or not producto.disponible:
             return jsonify({'error': f'Producto no disponible'}), 400
 
+        sabores_seleccionados = item.get('sabores')
+        if sabores_seleccionados is None:
+            # Compatibilidad hacia atrás con payload antiguo (campo unico 'sabor').
+            sabor_unico = item.get('sabor')
+            sabores_seleccionados = [sabor_unico] if sabor_unico else []
+
+        sabores_seleccionados = [str(s).strip() for s in sabores_seleccionados if str(s).strip()]
+
+        sabores_permitidos = {s.nombre for s in producto.sabores if s.activo}
+        max_sabores = int(producto.max_sabores or 1)
+
+        if sabores_permitidos:
+            if not sabores_seleccionados:
+                return jsonify({'error': f'Debes seleccionar al menos 1 sabor para {producto.nombre}'}), 400
+
+            if len(sabores_seleccionados) > max_sabores:
+                return jsonify({'error': f'{producto.nombre} permite maximo {max_sabores} sabor(es)'}), 400
+
+            invalidos = [s for s in sabores_seleccionados if s not in sabores_permitidos]
+            if invalidos:
+                return jsonify({'error': f'Sabor no permitido para {producto.nombre}: {", ".join(invalidos)}'}), 400
+        elif sabores_seleccionados:
+            return jsonify({'error': f'{producto.nombre} no tiene sabores configurados'}), 400
+
         subtotal = producto.precio * item['cantidad']
         total += subtotal
 
@@ -209,7 +278,8 @@ def crear_pedido():
             pedido_id=nuevo_pedido.id,
             producto_id=producto.id,
             cantidad=item['cantidad'],
-            subtotal=subtotal
+            subtotal=subtotal,
+            sabor=', '.join(sabores_seleccionados) if sabores_seleccionados else None
         )
         db.session.add(detalle)
 
@@ -226,15 +296,51 @@ def crear_pedido():
         if abs((m_efect + m_transf) - total) > 0.01:
             return jsonify({'error': f'Los montos (Efectivo: ${m_efect:.2f}, Transferencia: ${m_transf:.2f}) no suman el total del pedido (${total:.2f})'}), 400
 
+    _avanzar_contador_tickets()
+
     db.session.commit()
 
     return jsonify({
         'mensaje': 'Pedido creado correctamente',
         'id': nuevo_pedido.id,
+        'numero_pedido': _numero_visual_pedido(nuevo_pedido),
         'total': total,
         'ticket_url': f'/pedidos/{nuevo_pedido.id}/ticket',
         'ticket_guardado': False,
     }), 201
+
+
+@pedidos_bp.route('/contador', methods=['GET'])
+def obtener_siguiente_numero_pedido():
+    return jsonify({'siguiente_numero': _calcular_siguiente_numero_pedido()})
+
+
+@pedidos_bp.route('/contador/reiniciar', methods=['POST'])
+@login_required
+def reiniciar_contador_pedidos():
+    """
+    Reinicia el contador visual de pedidos al recomputar desde cero.
+    Se recomienda limpiar registros con /limpiar-datos para evitar duplicados visuales.
+    """
+    if not current_user.puede_eliminar_registros():
+        return jsonify({'error': 'No autorizado para reiniciar contador de pedidos'}), 403
+
+    try:
+        config = ConfiguracionSistema.query.filter_by(clave='contador_ticket_diario').first()
+        if not config:
+            config = ConfiguracionSistema(clave='contador_ticket_diario', valor_entero=1)
+        else:
+            config.valor_entero = 1
+
+        Pedido.query.update({Pedido.numero_pedido: None})
+
+        db.session.add(config)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'No se pudo reiniciar el contador de pedidos'}), 500
+
+    return jsonify({'mensaje': 'Contador visual reiniciado. El próximo pedido será #1.'})
 
 # ==========================================
 # PUT /pedidos/<id>/estado → Cambia el estado del pedido
@@ -267,7 +373,7 @@ def cambiar_estado(pedido_id):
             # ── NUEVO: suma al desglose por forma de pago
             if pedido.forma_pago == 'efectivo':
                 caja_abierta.total_efectivo += pedido.total
-            elif pedido.forma_pago == 'transferencia':
+            elif pedido.forma_pago in ['transferencia', 'pago_pedidosya', 'tarjeta']:
                 caja_abierta.total_transferencia += pedido.total
             elif pedido.forma_pago == 'mixto':
                 caja_abierta.total_efectivo += (pedido.monto_efectivo or 0.0)

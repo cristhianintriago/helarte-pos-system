@@ -31,6 +31,7 @@ from datetime import date
 from flask_bcrypt import Bcrypt
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from sqlalchemy import inspect, text
 
 
 # Se instancia la aplicación de Flask, esto será el núcleo de nuestro proyecto
@@ -97,10 +98,62 @@ app.register_blueprint(reporte_diario_bp)
 app.register_blueprint(usuarios_bp)
 app.register_blueprint(admin_bp)
 
+
+def _agregar_columna_si_falta(table_name, column_name, ddl):
+    inspector = inspect(db.engine)
+    if not inspector.has_table(table_name):
+        return
+
+    columnas = {c['name'] for c in inspector.get_columns(table_name)}
+    if column_name in columnas:
+        return
+
+    db.session.execute(text(ddl))
+    db.session.commit()
+    print(f"Migracion aplicada: {table_name}.{column_name}")
+
+
+def _sincronizar_esquema_legacy():
+    _agregar_columna_si_falta('productos', 'imagen_url', 'ALTER TABLE productos ADD COLUMN imagen_url VARCHAR(500)')
+    _agregar_columna_si_falta('productos', 'max_sabores', 'ALTER TABLE productos ADD COLUMN max_sabores INTEGER')
+    _agregar_columna_si_falta('detalles_pedido', 'sabor', 'ALTER TABLE detalles_pedido ADD COLUMN sabor VARCHAR(120)')
+
+    _agregar_columna_si_falta('pedidos', 'numero_comprobante', 'ALTER TABLE pedidos ADD COLUMN numero_comprobante VARCHAR(50)')
+    _agregar_columna_si_falta('pedidos', 'numero_pedido', 'ALTER TABLE pedidos ADD COLUMN numero_pedido INTEGER')
+    _agregar_columna_si_falta('pedidos', 'plataforma', 'ALTER TABLE pedidos ADD COLUMN plataforma VARCHAR(80)')
+    _agregar_columna_si_falta('pedidos', 'monto_efectivo', 'ALTER TABLE pedidos ADD COLUMN monto_efectivo FLOAT')
+    _agregar_columna_si_falta('pedidos', 'monto_transferencia', 'ALTER TABLE pedidos ADD COLUMN monto_transferencia FLOAT')
+
+    _agregar_columna_si_falta('ventas', 'numero_comprobante', 'ALTER TABLE ventas ADD COLUMN numero_comprobante VARCHAR(50)')
+    _agregar_columna_si_falta('ventas', 'monto_efectivo', 'ALTER TABLE ventas ADD COLUMN monto_efectivo FLOAT')
+    _agregar_columna_si_falta('ventas', 'monto_transferencia', 'ALTER TABLE ventas ADD COLUMN monto_transferencia FLOAT')
+
+    _agregar_columna_si_falta('caja', 'total_efectivo', 'ALTER TABLE caja ADD COLUMN total_efectivo FLOAT')
+    _agregar_columna_si_falta('caja', 'total_transferencia', 'ALTER TABLE caja ADD COLUMN total_transferencia FLOAT')
+
+    # Normaliza registros antiguos para evitar nulos en reglas de sabores.
+    db.session.execute(text('UPDATE productos SET max_sabores = 1 WHERE max_sabores IS NULL OR max_sabores < 1'))
+    db.session.commit()
+
+
+def _crear_sabores_default():
+    from models.models import Sabor
+
+    if Sabor.query.count() > 0:
+        return
+
+    defaults = ['Vainilla', 'Chocolate', 'Fresa', 'Oreo', 'Mora', 'Ron Pasas']
+    for nombre in defaults:
+        db.session.add(Sabor(nombre=nombre, activo=True))
+    db.session.commit()
+    print('Sabores base creados')
+
 # Bloque que interacciona con el contexto de la aplicación, ejecutado al inicio para asegurar la BD
 with app.app_context():
     # Creamos las tablas en la BD en caso de que no existan aún
     db.create_all()
+    _sincronizar_esquema_legacy()
+    _crear_sabores_default()
 
     # Inserción de cuenta administradora de defecto ('root')
     if not Usuario.query.filter_by(username='root').first():
