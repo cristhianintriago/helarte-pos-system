@@ -8,9 +8,119 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
+import os
 
 
 pedidos_bp = Blueprint('pedidos', __name__, url_prefix='/pedidos')
+
+
+def _obtener_ticket_path(pedido_id):
+    tickets_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'instance', 'tickets')
+    os.makedirs(tickets_dir, exist_ok=True)
+    return os.path.join(tickets_dir, f'ticket_pedido_{pedido_id}.pdf')
+
+
+def _construir_ticket_pdf(pedido):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        leftMargin=0.6 * inch,
+        rightMargin=0.6 * inch,
+        topMargin=0.5 * inch,
+        bottomMargin=0.5 * inch,
+    )
+    styles = getSampleStyleSheet()
+    elementos = []
+
+    titulo_style = ParagraphStyle(
+        'TicketTitle',
+        parent=styles['Heading1'],
+        fontSize=18,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#202124'),
+        spaceAfter=4,
+    )
+    sub_style = ParagraphStyle(
+        'TicketSub',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#5f6368'),
+        spaceAfter=10,
+    )
+    right_style = ParagraphStyle(
+        'TicketRight',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_RIGHT,
+        textColor=colors.HexColor('#202124'),
+    )
+
+    elementos.append(Paragraph('Helarte', titulo_style))
+    elementos.append(Paragraph('Ticket de Pedido', sub_style))
+
+    encabezado = [
+        ['Ticket #', f'{pedido.id}'],
+        ['Fecha', pedido.fecha.strftime('%d/%m/%Y %H:%M')],
+        ['Cliente', pedido.cliente_nombre or 'Consumidor final'],
+        ['Tipo', pedido.tipo.title()],
+        ['Pago', pedido.forma_pago.title()],
+    ]
+    if pedido.numero_comprobante:
+        encabezado.append(['Comprobante', pedido.numero_comprobante])
+
+    tabla_info = Table(encabezado, colWidths=[2.0 * inch, 4.4 * inch])
+    tabla_info.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#374151')),
+        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#111827')),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    elementos.append(tabla_info)
+    elementos.append(Spacer(1, 0.16 * inch))
+
+    data_items = [['Producto', 'Cant.', 'P. Unit.', 'Subtotal']]
+    for d in pedido.detalles:
+        data_items.append([
+            d.producto.nombre,
+            str(d.cantidad),
+            f"${float(d.subtotal) / float(d.cantidad):.2f}",
+            f"${float(d.subtotal):.2f}",
+        ])
+
+    tabla_items = Table(data_items, colWidths=[3.1 * inch, 0.7 * inch, 1.1 * inch, 1.5 * inch])
+    tabla_items.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#111827')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#d1d5db')),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_items)
+    elementos.append(Spacer(1, 0.16 * inch))
+
+    elementos.append(Paragraph(f"<b>Total a pagar: ${float(pedido.total):.2f}</b>", right_style))
+    elementos.append(Spacer(1, 0.08 * inch))
+    elementos.append(Paragraph('Gracias por preferir Helarte.', sub_style))
+
+    doc.build(elementos)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def _guardar_ticket_pdf(pedido):
+    ticket_path = _obtener_ticket_path(pedido.id)
+    pdf_bytes = _construir_ticket_pdf(pedido)
+    with open(ticket_path, 'wb') as ticket_file:
+        ticket_file.write(pdf_bytes)
+    return ticket_path
 
 
 
@@ -118,7 +228,16 @@ def crear_pedido():
 
     db.session.commit()
 
-    return jsonify({'mensaje': 'Pedido creado correctamente', 'id': nuevo_pedido.id, 'total': total}), 201
+    # Genera y guarda automáticamente el ticket al confirmar el pedido.
+    ticket_path = _guardar_ticket_pdf(nuevo_pedido)
+
+    return jsonify({
+        'mensaje': 'Pedido creado correctamente',
+        'id': nuevo_pedido.id,
+        'total': total,
+        'ticket_url': f'/pedidos/{nuevo_pedido.id}/ticket',
+        'ticket_guardado': bool(ticket_path),
+    }), 201
 
 # ==========================================
 # PUT /pedidos/<id>/estado → Cambia el estado del pedido
@@ -165,100 +284,12 @@ def cambiar_estado(pedido_id):
 def generar_ticket_pedido(pedido_id):
     """Genera un ticket imprimible (PDF) para un pedido específico."""
     pedido = Pedido.query.get_or_404(pedido_id)
+    ticket_path = _obtener_ticket_path(pedido.id)
+    if not os.path.exists(ticket_path):
+        _guardar_ticket_pdf(pedido)
 
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=letter,
-        leftMargin=0.6 * inch,
-        rightMargin=0.6 * inch,
-        topMargin=0.5 * inch,
-        bottomMargin=0.5 * inch,
-    )
-    styles = getSampleStyleSheet()
-    elementos = []
-
-    titulo_style = ParagraphStyle(
-        'TicketTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        alignment=TA_CENTER,
-        textColor=colors.HexColor('#202124'),
-        spaceAfter=4,
-    )
-    sub_style = ParagraphStyle(
-        'TicketSub',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=TA_CENTER,
-        textColor=colors.HexColor('#5f6368'),
-        spaceAfter=10,
-    )
-    right_style = ParagraphStyle(
-        'TicketRight',
-        parent=styles['Normal'],
-        fontSize=10,
-        alignment=TA_RIGHT,
-        textColor=colors.HexColor('#202124'),
-    )
-
-    elementos.append(Paragraph('Helarte', titulo_style))
-    elementos.append(Paragraph('Ticket de Pedido', sub_style))
-
-    encabezado = [
-        ['Ticket #', f'{pedido.id}'],
-        ['Fecha', pedido.fecha.strftime('%d/%m/%Y %H:%M')],
-        ['Cliente', pedido.cliente_nombre or 'Consumidor final'],
-        ['Tipo', pedido.tipo.title()],
-        ['Pago', pedido.forma_pago.title()],
-    ]
-    if pedido.numero_comprobante:
-        encabezado.append(['Comprobante', pedido.numero_comprobante])
-
-    tabla_info = Table(encabezado, colWidths=[2.0 * inch, 4.4 * inch])
-    tabla_info.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#374151')),
-        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#111827')),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-    ]))
-    elementos.append(tabla_info)
-    elementos.append(Spacer(1, 0.16 * inch))
-
-    data_items = [['Producto', 'Cant.', 'P. Unit.', 'Subtotal']]
-    for d in pedido.detalles:
-        data_items.append([
-            d.producto.nombre,
-            str(d.cantidad),
-            f"${float(d.subtotal) / float(d.cantidad):.2f}",
-            f"${float(d.subtotal):.2f}",
-        ])
-
-    tabla_items = Table(data_items, colWidths=[3.1 * inch, 0.7 * inch, 1.1 * inch, 1.5 * inch])
-    tabla_items.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#111827')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#d1d5db')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-    ]))
-    elementos.append(tabla_items)
-    elementos.append(Spacer(1, 0.16 * inch))
-
-    elementos.append(Paragraph(f"<b>Total a pagar: ${float(pedido.total):.2f}</b>", right_style))
-    elementos.append(Spacer(1, 0.08 * inch))
-    elementos.append(Paragraph('Gracias por preferir Helarte.', sub_style))
-
-    doc.build(elementos)
-    buffer.seek(0)
     return send_file(
-        buffer,
+        ticket_path,
         mimetype='application/pdf',
         as_attachment=True,
         download_name=f'ticket_pedido_{pedido.id}.pdf'

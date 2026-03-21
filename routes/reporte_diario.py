@@ -158,6 +158,15 @@ def generar_pdf_fecha(fecha):
         spaceBefore=14
     )
 
+    indicador_style = ParagraphStyle(
+        'IndicadorStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#111827'),
+        leading=14,
+    )
+
     # Encabezado
     logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'img', 'logo.png')
     if os.path.exists(logo_path):
@@ -173,9 +182,9 @@ def generar_pdf_fecha(fecha):
     ))
 
     indicadores_data = [[
-        f"<b>Total ventas</b><br/>${sum(v.total for v in ventas):.2f}",
-        f"<b>Tickets emitidos</b><br/>{len(ventas)}",
-        f"<b>Ticket promedio</b><br/>${(sum(v.total for v in ventas) / len(ventas)) if ventas else 0:.2f}",
+        Paragraph(f"<b>Total ventas</b><br/>${sum(v.total for v in ventas):.2f}", indicador_style),
+        Paragraph(f"<b>Tickets emitidos</b><br/>{len(ventas)}", indicador_style),
+        Paragraph(f"<b>Ticket promedio</b><br/>${(sum(v.total for v in ventas) / len(ventas)) if ventas else 0:.2f}", indicador_style),
     ]]
     tabla_indicadores = Table(indicadores_data, colWidths=[2.1 * inch, 2.1 * inch, 2.1 * inch])
     tabla_indicadores.setStyle(TableStyle([

@@ -263,6 +263,9 @@ async function confirmarPedido() {
 
     if (respuesta.ok) {
         mostrarToast(`Pedido confirmado. Total: $${resultado.total.toFixed(2)}`, 'success');
+        if (resultado.ticket_url) {
+            window.open(resultado.ticket_url, '_blank');
+        }
         limpiarPedido();
         // Refrescamos la cola de activos inmediatamente para que aparezca el nuevo pedido
         cargarPedidosActivos();
