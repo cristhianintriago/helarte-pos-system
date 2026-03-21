@@ -280,7 +280,9 @@ def cambiar_estado(pedido_id):
 @pedidos_bp.route('/<int:pedido_id>', methods=['DELETE'])
 def eliminar_pedido(pedido_id):
     """Elimina un pedido activo cuando el cliente cancela la orden."""
-    pedido = Pedido.query.get_or_404(pedido_id)
+    pedido = Pedido.query.get(pedido_id)
+    if not pedido:
+        return jsonify({'error': 'El pedido ya no existe o fue eliminado'}), 404
 
     if pedido.estado == 'entregado':
         return jsonify({'error': 'No se puede eliminar un pedido ya entregado'}), 400
@@ -289,9 +291,13 @@ def eliminar_pedido(pedido_id):
     if venta_asociada:
         return jsonify({'error': 'No se puede eliminar un pedido con venta registrada'}), 400
 
-    DetallePedido.query.filter_by(pedido_id=pedido.id).delete()
-    db.session.delete(pedido)
-    db.session.commit()
+    try:
+        DetallePedido.query.filter_by(pedido_id=pedido.id).delete()
+        db.session.delete(pedido)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        return jsonify({'error': 'Ocurrió un problema al eliminar el pedido'}), 500
 
     return jsonify({'mensaje': 'Pedido eliminado correctamente'})
 

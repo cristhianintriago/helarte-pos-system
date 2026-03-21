@@ -364,13 +364,17 @@ async function eliminarPedido(pedidoId) {
             method: 'DELETE'
         });
 
-        const datos = await respuesta.json();
+        let datos = {};
+        const contentType = respuesta.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            datos = await respuesta.json();
+        }
 
         if (respuesta.ok) {
             mostrarToast('Pedido eliminado correctamente', 'success');
             cargarPedidosActivos();
         } else {
-            mostrarToast(datos.error || 'No se pudo eliminar el pedido', 'danger');
+            mostrarToast(datos.error || 'No se pudo eliminar el pedido', 'warning');
         }
     } catch (error) {
         mostrarToast('Error de conexión al eliminar pedido', 'danger');
