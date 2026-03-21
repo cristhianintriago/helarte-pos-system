@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 from models.models import db, Producto
 import cloudinary
 import cloudinary.uploader
@@ -44,7 +44,10 @@ def obtener_productos():
 # POST /productos/ → Crea un nuevo producto
 # ==========================================
 @productos_bp.route('/', methods=['POST'])
+@login_required
 def crear_producto():
+    if not current_user.puede_gestionar_productos():
+        return jsonify({'error': 'Se requiere rol de administrador o superior'}), 403
     datos = request.json
 
     nuevo_producto = Producto(
@@ -91,7 +94,10 @@ def upload_imagen():
 # PUT /productos/<id> → Actualiza un producto existente
 # ==========================================
 @productos_bp.route('/<int:producto_id>', methods=['PUT'])
+@login_required
 def actualizar_producto(producto_id):
+    if not current_user.puede_gestionar_productos():
+        return jsonify({'error': 'Se requiere rol de administrador o superior'}), 403
     producto = Producto.query.get_or_404(producto_id)
     datos = request.json
 

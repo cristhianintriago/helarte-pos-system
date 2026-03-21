@@ -24,6 +24,7 @@ from routes.reportes import reportes_bp
 from routes.auth import auth_bp
 from routes.reporte_diario import reporte_diario_bp
 from routes.usuarios import usuarios_bp
+from routes.admin import admin_bp
 
 import hashlib
 from datetime import date
@@ -44,6 +45,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # La clave secreta es necesaria para mantener sesiones seguras
 app.secret_key = os.environ.get('SECRET_KEY', 'helarte_secret_key')
+# Desactivamos el caché de archivos estáticos para que el browser siempre cargue el JS/CSS más reciente
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 
 # Se instancia Flask-Login para el manejo y protección de rutas con autenticación
@@ -71,6 +75,7 @@ app.register_blueprint(ventas_bp)
 app.register_blueprint(reportes_bp)
 app.register_blueprint(reporte_diario_bp)
 app.register_blueprint(usuarios_bp)
+app.register_blueprint(admin_bp)
 
 # Bloque que interacciona con el contexto de la aplicación, ejecutado al inicio para asegurar la BD
 with app.app_context():

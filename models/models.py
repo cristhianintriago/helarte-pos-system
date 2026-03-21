@@ -39,8 +39,13 @@ class Pedido(db.Model):
     cliente_direccion = db.Column(db.String(200), nullable=True)
     estado = db.Column(db.String(20), default='pendiente')
     total = db.Column(db.Float, default=0.0)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow) # Guarda la fecha y hora de creación de forma automática
+    fecha = db.Column(db.DateTime, default=datetime.now) # Guarda la fecha y hora de creación según el reloj local del servidor
     forma_pago = db.Column(db.String(20), default='efectivo')
+    
+    # Nuevos campos para registro de pagos mixtos y transferencias
+    numero_comprobante = db.Column(db.String(50), nullable=True)
+    monto_efectivo = db.Column(db.Float, nullable=True)
+    monto_transferencia = db.Column(db.Float, nullable=True)
 
     # Relación uno-a-muchos: Un pedido puede tener muchos Detalles de Pedido.
     # 'backref' crea virtualmente un atributo 'pedido' dentro del modelo DetallePedido para acceder de regreso.
@@ -74,8 +79,13 @@ class Venta(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=False)
     total = db.Column(db.Float, nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=datetime.now)
     forma_pago = db.Column(db.String(20), default='efectivo')
+
+    # Guardar comprobante e importes del detalle del pago de la venta
+    numero_comprobante = db.Column(db.String(50), nullable=True)
+    monto_efectivo = db.Column(db.Float, nullable=True)
+    monto_transferencia = db.Column(db.Float, nullable=True)
 
     pedido = db.relationship('Pedido')
 
@@ -87,7 +97,7 @@ class Caja(db.Model):
     __tablename__ = 'caja'
 
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=datetime.now)
     monto_inicial = db.Column(db.Float, nullable=False)
     total_ingresos = db.Column(db.Float, default=0.0)
     total_egresos = db.Column(db.Float, default=0.0)
@@ -107,4 +117,4 @@ class Egreso(db.Model):
     caja_id = db.Column(db.Integer, db.ForeignKey('caja.id'), nullable=False)
     descripcion = db.Column(db.String(200), nullable=False)
     monto = db.Column(db.Float, nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha = db.Column(db.DateTime, default=datetime.now)

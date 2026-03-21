@@ -117,9 +117,6 @@ contenido %}
   </div>
 </div>
 
-{% endblock %} {% block scripts %}
-<script src="{{ url_for('static', filename='js/reportes.js') }}"></script>
-{% endblock %}
 <!-- MODAL HISTÓRICO -->
 <div class="modal fade" id="modal-historial" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -134,3 +131,8 @@ contenido %}
         </div>
     </div>
 </div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reportes.js') }}"></script>
+{% endblock %}

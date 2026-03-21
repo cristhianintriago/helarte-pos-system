@@ -34,7 +34,10 @@ def obtener_pedidos():
             'cliente_direccion': p.cliente_direccion,
             'estado': p.estado,
             'total': p.total,
-            'forma_pago': p.forma_pago,  # ── NUEVO
+            'forma_pago': p.forma_pago,
+            'numero_comprobante': p.numero_comprobante,
+            'monto_efectivo': p.monto_efectivo,
+            'monto_transferencia': p.monto_transferencia,
             'fecha': p.fecha.strftime('%Y-%m-%d %H:%M'),  # Formato legible
             'detalles': detalles
         })
@@ -54,13 +57,21 @@ def crear_pedido():
     """
     datos = request.json
 
+    forma_pago = datos.get('forma_pago', 'efectivo')
+    
+    if forma_pago == 'transferencia' and not datos.get('numero_comprobante'):
+        return jsonify({'error': 'El número de comprobante es requerido para transferencia'}), 400
+
     # Creamos el pedido principal
     nuevo_pedido = Pedido(
         tipo=datos['tipo'],
-        cliente_nombre=datos.get('cliente_nombre', 'Consumidor final'),  # ── NUEVO: nombre por defecto
+        cliente_nombre=datos.get('cliente_nombre', 'Consumidor final'),
         cliente_telefono=datos.get('cliente_telefono'),
         cliente_direccion=datos.get('cliente_direccion'),
-        forma_pago=datos.get('forma_pago', 'efectivo')  # ── NUEVO: forma de pago
+        forma_pago=forma_pago,
+        numero_comprobante=datos.get('numero_comprobante'),
+        monto_efectivo=float(datos.get('monto_efectivo') or 0.0),
+        monto_transferencia=float(datos.get('monto_transferencia') or 0.0)
     )
 
     db.session.add(nuevo_pedido)
@@ -87,6 +98,17 @@ def crear_pedido():
 
     # Actualizamos el total general del pedido a nivel de la cabecera
     nuevo_pedido.total = total
+    
+    # Validar montos para pagos mixtos asegurando que la suma de efectivo y transferencia coincida con el total
+    if forma_pago == 'mixto':
+        if not datos.get('numero_comprobante'):
+            return jsonify({'error': 'El número de comprobante es requerido para pagos mixtos'}), 400
+        
+        m_efect = nuevo_pedido.monto_efectivo
+        m_transf = nuevo_pedido.monto_transferencia
+        if abs((m_efect + m_transf) - total) > 0.01:
+            return jsonify({'error': f'Los montos (Efectivo: ${m_efect:.2f}, Transferencia: ${m_transf:.2f}) no suman el total del pedido (${total:.2f})'}), 400
+
     db.session.commit()
 
     return jsonify({'mensaje': 'Pedido creado correctamente', 'id': nuevo_pedido.id, 'total': total}), 201
@@ -108,7 +130,10 @@ def cambiar_estado(pedido_id):
         venta = Venta(
             pedido_id=pedido.id,
             total=pedido.total,
-            forma_pago=pedido.forma_pago  # ── NUEVO: copia la forma de pago
+            forma_pago=pedido.forma_pago,
+            numero_comprobante=pedido.numero_comprobante,
+            monto_efectivo=pedido.monto_efectivo,
+            monto_transferencia=pedido.monto_transferencia
         )
         db.session.add(venta)
 
@@ -122,10 +147,8 @@ def cambiar_estado(pedido_id):
             elif pedido.forma_pago == 'transferencia':
                 caja_abierta.total_transferencia += pedido.total
             elif pedido.forma_pago == 'mixto':
-                # Mixto se divide 50/50 entre efectivo y transferencia
-                mitad = pedido.total / 2
-                caja_abierta.total_efectivo += mitad
-                caja_abierta.total_transferencia += mitad
+                caja_abierta.total_efectivo += (pedido.monto_efectivo or 0.0)
+                caja_abierta.total_transferencia += (pedido.monto_transferencia or 0.0)
 
     db.session.commit()
     return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado}'})

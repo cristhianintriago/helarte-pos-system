@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block titulo %}Panel de Administración{% endblock %}
+{% block contenido %}
+
+<div class="row mb-4">
+  <div class="col">
+    <h4><i class="bi bi-shield-lock-fill text-danger"></i> Panel de Administración <span class="badge bg-danger ms-2">Solo Root</span></h4>
+    <p class="text-muted small">Desde aquí puedes eliminar registros históricos de caja y ventas. <strong>Esta acción es irreversible.</strong></p>
+  </div>
+</div>
+
+<!-- =====================================================
+     SECCIÓN 1: Registros de Caja
+     ===================================================== -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-cash-stack"></i> Registros de Caja</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-light" onclick="seleccionarTodoCajas()">
+        <i class="bi bi-check-all"></i> Seleccionar todo
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="eliminarCajasSeleccionadas()">
+        <i class="bi bi-trash"></i> Eliminar seleccionados
+      </button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" id="check-all-cajas" onchange="toggleTodosCajas(this)"></th>
+            <th>Fecha</th>
+            <th>Inicial</th>
+            <th>Ingresos</th>
+            <th>Egresos</th>
+            <th>Final</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-cajas">
+          <tr><td colspan="6" class="text-center text-muted py-3">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
+     SECCIÓN 2: Registros de Ventas
+     ===================================================== -->
+<div class="card shadow-sm">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-receipt"></i> Registros de Ventas</span>
+    <div class="d-flex gap-2">
+      <button class="btn btn-sm btn-outline-light" onclick="seleccionarTodoVentas()">
+        <i class="bi bi-check-all"></i> Seleccionar todo
+      </button>
+      <button class="btn btn-sm btn-danger" onclick="eliminarVentasSeleccionadas()">
+        <i class="bi bi-trash"></i> Eliminar seleccionados
+      </button>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 40px;"><input type="checkbox" id="check-all-ventas" onchange="toggleTodosVentas(this)"></th>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>Tipo</th>
+            <th>Forma de Pago</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-ventas">
+          <tr><td colspan="6" class="text-center text-muted py-3">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}
