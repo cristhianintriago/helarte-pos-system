@@ -75,11 +75,15 @@ app.extensions['bcrypt'] = bcrypt
 
 # ── Flask-Limiter: protege rutas contra abuso por exceso de peticiones ──
 # Por defecto limita por dirección IP del cliente.
+rate_limit_default = os.environ.get('DEFAULT_RATE_LIMIT', '500 per day')
+rate_limit_login = os.environ.get('LOGIN_RATE_LIMIT', '10 per minute')
+rate_limit_storage = os.environ.get('RATELIMIT_STORAGE_URI', 'memory://')
+
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["500 per day"],
-    storage_uri="memory://"  # En producción usar Redis
+    default_limits=[rate_limit_default],
+    storage_uri=rate_limit_storage
 )
 
 # Registramos los distintos módulos del proyecto, también conocidos en Flask como 'blueprints'.
@@ -87,7 +91,7 @@ limiter = Limiter(
 app.register_blueprint(auth_bp)
 # Aplicamos rate limiting al login: máx 10 intentos por minuto por IP
 # Esto evita ataques de fuerza bruta sin modificar el blueprint directamente.
-limiter.limit("10 per minute")(app.view_functions['auth.login'])
+app.view_functions['auth.login'] = limiter.limit(rate_limit_login)(app.view_functions['auth.login'])
 app.register_blueprint(productos_bp)
 app.register_blueprint(pedidos_bp)
 app.register_blueprint(caja_bp)
