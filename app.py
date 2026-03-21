@@ -28,6 +28,9 @@ from routes.admin import admin_bp
 
 import hashlib
 from datetime import date
+from flask_bcrypt import Bcrypt
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 
 # Se instancia la aplicación de Flask, esto será el núcleo de nuestro proyecto
@@ -65,9 +68,26 @@ def load_user(user_id):
 # Se inicializa SQLAlchemy en nuestra app
 db.init_app(app)
 
+# ── Flask-Bcrypt: biblioteca para hasheo seguro de contraseñas con bcrypt ──
+# A diferencia de SHA-256, bcrypt incluye salt automático y es resistente a ataques de fuerza bruta.
+bcrypt = Bcrypt(app)
+app.extensions['bcrypt'] = bcrypt
+
+# ── Flask-Limiter: protege rutas contra abuso por exceso de peticiones ──
+# Por defecto limita por dirección IP del cliente.
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["500 per day"],
+    storage_uri="memory://"  # En producción usar Redis
+)
+
 # Registramos los distintos módulos del proyecto, también conocidos en Flask como 'blueprints'.
 # Esto nos ayuda a mantener un diseño modular y escalable.
 app.register_blueprint(auth_bp)
+# Aplicamos rate limiting al login: máx 10 intentos por minuto por IP
+# Esto evita ataques de fuerza bruta sin modificar el blueprint directamente.
+limiter.limit("10 per minute")(app.view_functions['auth.login'])
 app.register_blueprint(productos_bp)
 app.register_blueprint(pedidos_bp)
 app.register_blueprint(caja_bp)
