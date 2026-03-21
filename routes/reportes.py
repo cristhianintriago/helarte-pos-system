@@ -5,7 +5,6 @@ from datetime import datetime, date, time
 from sqlalchemy import func
 from io import StringIO, BytesIO
 import csv
-from openpyxl import Workbook
 
 reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 
@@ -140,6 +139,13 @@ def exportar_csv():
 @login_required
 def exportar_excel():
     ventas, desde, hasta = _obtener_ventas_rango(request.args.get('desde'), request.args.get('hasta'))
+
+    try:
+        from openpyxl import Workbook
+    except ModuleNotFoundError:
+        return jsonify({
+            'error': 'Exportacion a Excel no disponible: falta dependencia openpyxl en el servidor.'
+        }), 503
 
     wb = Workbook()
     ws = wb.active
