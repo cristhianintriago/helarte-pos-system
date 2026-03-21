@@ -1,10 +1,23 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, Response, send_file
 from flask_login import login_required, current_user
 from models.models import db, Venta, DetallePedido, Producto
-from datetime import datetime
+from datetime import datetime, date, time
 from sqlalchemy import func
+from io import StringIO, BytesIO
+import csv
+from openpyxl import Workbook
 
 reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
+
+
+def _rango_fechas(desde_str, hasta_str):
+    """Normaliza el rango de fechas y aplica valores por defecto (hoy)."""
+    hoy = date.today()
+    desde_str = desde_str or hoy.strftime('%Y-%m-%d')
+    hasta_str = hasta_str or hoy.strftime('%Y-%m-%d')
+    desde = datetime.strptime(desde_str, '%Y-%m-%d')
+    hasta = datetime.strptime(hasta_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    return desde, hasta
 
 
 @reportes_bp.route('/', methods=['GET'])
@@ -19,8 +32,7 @@ def obtener_reporte():
     desde_str = request.args.get('desde')
     hasta_str = request.args.get('hasta')
 
-    desde = datetime.strptime(desde_str, '%Y-%m-%d')
-    hasta = datetime.strptime(hasta_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+    desde, hasta = _rango_fechas(desde_str, hasta_str)
 
     ventas = Venta.query.filter(
         Venta.fecha >= desde,
@@ -59,6 +71,107 @@ def obtener_reporte():
             for p in top_productos
         ]
     })
+
+
+@reportes_bp.route('/dashboard-hoy', methods=['GET'])
+@login_required
+def dashboard_hoy():
+    """Resumen visual del día, agrupando ventas por hora para el gráfico principal."""
+    inicio = datetime.combine(date.today(), time.min)
+    fin = datetime.combine(date.today(), time.max)
+
+    ventas_hoy = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
+
+    # Genera 24 etiquetas fijas para dar consistencia visual al dashboard.
+    etiquetas = [f"{h:02d}:00" for h in range(24)]
+    ventas_por_hora = [0.0] * 24
+    tickets_por_hora = [0] * 24
+
+    for venta in ventas_hoy:
+        hora = venta.fecha.hour
+        ventas_por_hora[hora] += float(venta.total)
+        tickets_por_hora[hora] += 1
+
+    return jsonify({
+        'fecha': date.today().strftime('%Y-%m-%d'),
+        'total_vendido_hoy': round(sum(ventas_por_hora), 2),
+        'total_tickets_hoy': len(ventas_hoy),
+        'labels': etiquetas,
+        'ventas_por_hora': [round(v, 2) for v in ventas_por_hora],
+        'tickets_por_hora': tickets_por_hora,
+    })
+
+
+def _obtener_ventas_rango(desde_str, hasta_str):
+    desde, hasta = _rango_fechas(desde_str, hasta_str)
+    ventas = Venta.query.filter(Venta.fecha >= desde, Venta.fecha <= hasta).order_by(Venta.fecha.desc()).all()
+    return ventas, desde, hasta
+
+
+@reportes_bp.route('/export/csv', methods=['GET'])
+@login_required
+def exportar_csv():
+    """Exporta las ventas del período a CSV para análisis rápido."""
+    ventas, desde, hasta = _obtener_ventas_rango(request.args.get('desde'), request.args.get('hasta'))
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'id_venta', 'fecha', 'cliente', 'tipo_pedido', 'forma_pago', 'total'
+    ])
+
+    for venta in ventas:
+        pedido = venta.pedido
+        writer.writerow([
+            venta.id,
+            venta.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+            pedido.cliente_nombre if pedido else '',
+            pedido.tipo if pedido else '',
+            venta.forma_pago,
+            f"{float(venta.total):.2f}",
+        ])
+
+    filename = f"reporte_{desde.strftime('%Y%m%d')}_{hasta.strftime('%Y%m%d')}.csv"
+    return Response(
+        output.getvalue(),
+        mimetype='text/csv',
+        headers={'Content-Disposition': f'attachment; filename={filename}'}
+    )
+
+
+@reportes_bp.route('/export/excel', methods=['GET'])
+@login_required
+def exportar_excel():
+    """Exporta las ventas del período a archivo Excel (.xlsx)."""
+    ventas, desde, hasta = _obtener_ventas_rango(request.args.get('desde'), request.args.get('hasta'))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Reporte Ventas'
+    ws.append(['ID Venta', 'Fecha', 'Cliente', 'Tipo Pedido', 'Forma Pago', 'Total'])
+
+    for venta in ventas:
+        pedido = venta.pedido
+        ws.append([
+            venta.id,
+            venta.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+            pedido.cliente_nombre if pedido else '',
+            pedido.tipo if pedido else '',
+            venta.forma_pago,
+            float(venta.total),
+        ])
+
+    stream = BytesIO()
+    wb.save(stream)
+    stream.seek(0)
+    filename = f"reporte_{desde.strftime('%Y%m%d')}_{hasta.strftime('%Y%m%d')}.xlsx"
+
+    return send_file(
+        stream,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 
 @reportes_bp.route('/ventas/lista', methods=['GET'])

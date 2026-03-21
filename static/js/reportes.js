@@ -1,7 +1,10 @@
 // Al cargar, establecemos el período de "hoy" por defecto
 document.addEventListener("DOMContentLoaded", () => {
+  cargarDashboardHoy();
   setPeriodo("mes");
 });
+
+let graficoHoy = null;
 
 // Establece fechas rápidas
 function setPeriodo(periodo) {
@@ -86,6 +89,75 @@ async function cargarReporte() {
       listaTop.appendChild(div);
     });
   }
+}
+
+async function cargarDashboardHoy() {
+  const respuesta = await fetch('/reportes/dashboard-hoy');
+  const datos = await respuesta.json();
+
+  document.getElementById('dash-fecha').textContent = datos.fecha;
+  document.getElementById('dash-total-hoy').textContent = `$${datos.total_vendido_hoy.toFixed(2)}`;
+  document.getElementById('dash-tickets-hoy').textContent = datos.total_tickets_hoy;
+
+  const canvas = document.getElementById('grafico-hoy');
+  if (!canvas || typeof Chart === 'undefined') return;
+
+  if (graficoHoy) {
+    graficoHoy.destroy();
+  }
+
+  graficoHoy = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: datos.labels,
+      datasets: [
+        {
+          label: 'Ventas ($)',
+          data: datos.ventas_por_hora,
+          borderColor: '#0d6efd',
+          backgroundColor: 'rgba(13, 110, 253, 0.15)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => `$${value}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function exportarCSV() {
+  const desde = document.getElementById('fecha-desde').value;
+  const hasta = document.getElementById('fecha-hasta').value;
+  if (!desde || !hasta) {
+    alert('Selecciona un rango de fechas para exportar');
+    return;
+  }
+  window.open(`/reportes/export/csv?desde=${desde}&hasta=${hasta}`, '_blank');
+}
+
+function exportarExcel() {
+  const desde = document.getElementById('fecha-desde').value;
+  const hasta = document.getElementById('fecha-hasta').value;
+  if (!desde || !hasta) {
+    alert('Selecciona un rango de fechas para exportar');
+    return;
+  }
+  window.open(`/reportes/export/excel?desde=${desde}&hasta=${hasta}`, '_blank');
 }
 // Descarga el PDF del día actual
 function descargarPDFHoy() {
