@@ -117,8 +117,12 @@ def _agregar_columna_si_falta(table_name, column_name, ddl):
 def _sincronizar_esquema_legacy():
     # Migraciones aditivas necesarias cuando el despliegue usa una BD previa a estos campos.
     _agregar_columna_si_falta('productos', 'imagen_url', 'ALTER TABLE productos ADD COLUMN imagen_url VARCHAR(500)')
+    _agregar_columna_si_falta('productos', 'max_sabores', 'ALTER TABLE productos ADD COLUMN max_sabores INTEGER')
+    _agregar_columna_si_falta('detalles_pedido', 'sabor', 'ALTER TABLE detalles_pedido ADD COLUMN sabor VARCHAR(120)')
 
     _agregar_columna_si_falta('pedidos', 'numero_comprobante', 'ALTER TABLE pedidos ADD COLUMN numero_comprobante VARCHAR(50)')
+    _agregar_columna_si_falta('pedidos', 'numero_pedido', 'ALTER TABLE pedidos ADD COLUMN numero_pedido INTEGER')
+    _agregar_columna_si_falta('pedidos', 'plataforma', 'ALTER TABLE pedidos ADD COLUMN plataforma VARCHAR(80)')
     _agregar_columna_si_falta('pedidos', 'monto_efectivo', 'ALTER TABLE pedidos ADD COLUMN monto_efectivo FLOAT')
     _agregar_columna_si_falta('pedidos', 'monto_transferencia', 'ALTER TABLE pedidos ADD COLUMN monto_transferencia FLOAT')
 
@@ -129,11 +133,28 @@ def _sincronizar_esquema_legacy():
     _agregar_columna_si_falta('caja', 'total_efectivo', 'ALTER TABLE caja ADD COLUMN total_efectivo FLOAT')
     _agregar_columna_si_falta('caja', 'total_transferencia', 'ALTER TABLE caja ADD COLUMN total_transferencia FLOAT')
 
+    # Normaliza registros antiguos para evitar nulos en reglas de sabores.
+    db.session.execute(text('UPDATE productos SET max_sabores = 1 WHERE max_sabores IS NULL OR max_sabores < 1'))
+    db.session.commit()
+
+
+def _crear_sabores_default():
+    from models.models import Sabor
+
+    if Sabor.query.count() > 0:
+        return
+
+    defaults = ['Vainilla', 'Chocolate', 'Fresa', 'Oreo', 'Mora', 'Ron Pasas']
+    for nombre in defaults:
+        db.session.add(Sabor(nombre=nombre, activo=True))
+    db.session.commit()
+    print('Sabores base creados')
 # Bloque que interacciona con el contexto de la aplicación, ejecutado al inicio para asegurar la BD
 with app.app_context():
     # Creamos las tablas en la BD en caso de que no existan aún
     db.create_all()
     _sincronizar_esquema_legacy()
+    _crear_sabores_default()
 
     # Inserción de cuenta administradora de defecto ('root')
     if not Usuario.query.filter_by(username='root').first():

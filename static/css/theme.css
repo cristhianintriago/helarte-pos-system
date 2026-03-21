@@ -419,10 +419,68 @@ h4 i {
     box-shadow: 0 8px 24px var(--rosa-glow) !important;
 }
 
+.producto-card.flash-add {
+    animation: flashAdd 180ms ease;
+}
+
+@keyframes flashAdd {
+    0% { transform: scale(1); box-shadow: 0 0 0 rgba(49,208,181,0); }
+    40% { transform: scale(0.985); box-shadow: 0 0 0 3px rgba(49,208,181,0.25); }
+    100% { transform: scale(1); box-shadow: 0 0 0 rgba(49,208,181,0); }
+}
+
 .producto-card.agotado {
     opacity: 0.5;
     cursor: not-allowed;
     filter: grayscale(50%);
+}
+
+.sabor-selector-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sabor-opcion {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 0.65rem 0.75rem;
+    background: #fff;
+    transition: var(--transicion);
+}
+
+.sabor-opcion:hover {
+    border-color: var(--rosa);
+    background: var(--rosa-light);
+}
+
+.producto-admin-mobile {
+    border: 1px solid var(--borde);
+    border-radius: 12px;
+    padding: 0.75rem;
+    margin-bottom: 0.7rem;
+    background: #fff;
+    box-shadow: var(--sombra-sm);
+}
+
+.producto-admin-mobile__img {
+    min-width: 56px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.offcanvas#offcanvas-pedidos-activos {
+    width: min(92vw, 420px);
+}
+
+.offcanvas#offcanvas-pedidos-activos .offcanvas-header {
+    background: linear-gradient(135deg, #1F2933, #2d3d4a);
+    color: #fff;
 }
 
 /* ===== LIST GROUP ===== */
@@ -602,6 +660,52 @@ hr { border-color: var(--borde); opacity: 1; }
     /* (ya lo hace Bootstrap con col-lg-*, pero añadimos orden explícito) */
     .col-lg-5 { order: 1; }
     .col-lg-7 { order: 2; }
+
+    .pedido-sticky {
+        position: static !important;
+        top: auto !important;
+    }
+
+    .main-content {
+        padding-bottom: 5.6rem;
+    }
+
+    .mobile-action-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 120;
+        background: rgba(255, 255, 255, 0.98);
+        border-top: 1px solid var(--borde);
+        box-shadow: 0 -8px 24px rgba(31, 41, 51, 0.12);
+        padding: 0.55rem 0.75rem calc(0.55rem + env(safe-area-inset-bottom));
+    }
+
+    .mobile-action-content {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+    }
+
+    .mobile-total-box {
+        min-width: 110px;
+        line-height: 1.1;
+    }
+
+    .mobile-action-buttons {
+        flex: 1;
+        justify-content: flex-end;
+    }
+
+    #items-pedido {
+        max-height: 260px !important;
+    }
+
+    .sabor-opcion {
+        padding: 0.75rem;
+    }
 
     /* ── Headers de sección ── */
     h4 {

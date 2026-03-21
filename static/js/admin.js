@@ -4,6 +4,27 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
+async function reiniciarContadorPedidos() {
+    const ok = confirm('Se reiniciara la numeracion visual de pedidos. Deseas continuar?');
+    if (!ok) return;
+
+    try {
+        const respuesta = await fetch('/pedidos/contador/reiniciar', {
+            method: 'POST'
+        });
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+            throw new Error(datos.error || 'No se pudo reiniciar el contador');
+        }
+
+        mostrarToast(datos.mensaje || 'Contador reiniciado', 'success');
+    } catch (error) {
+        mostrarToast(error.message || 'Error al reiniciar contador', 'danger');
+    }
+}
+
+
 // ==========================================
 // SECCIÓN: REGISTROS DE CAJA
 // ==========================================
