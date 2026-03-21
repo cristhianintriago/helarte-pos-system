@@ -6,10 +6,11 @@ from sqlalchemy import func
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
+import os
 
 # Blueprint para los reportes diarios
 reporte_diario_bp = Blueprint('reporte_diario', __name__, url_prefix='/reporte-diario')
@@ -97,6 +98,14 @@ def generar_pdf_fecha(fecha):
         Venta.fecha <= fin_dia
     ).group_by(Producto.nombre).order_by(func.sum(DetallePedido.cantidad).desc()).first()
 
+    top_productos = db.session.query(
+        Producto.nombre,
+        func.sum(DetallePedido.cantidad).label('cantidad')
+    ).join(DetallePedido).join(Pedido).join(Venta).filter(
+        Venta.fecha >= inicio_dia,
+        Venta.fecha <= fin_dia
+    ).group_by(Producto.nombre).order_by(func.sum(DetallePedido.cantidad).desc()).limit(5).all()
+
     # Egresos del día
     egresos = Egreso.query.filter_by(caja_id=caja.id).all()
 
@@ -140,9 +149,56 @@ def generar_pdf_fecha(fecha):
         spaceBefore=15
     )
 
+    foot_style = ParagraphStyle(
+        'FootCustom',
+        parent=styles['Normal'],
+        fontSize=9,
+        textColor=colors.HexColor('#6b7280'),
+        alignment=TA_CENTER,
+        spaceBefore=14
+    )
+
+    indicador_style = ParagraphStyle(
+        'IndicadorStyle',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor('#111827'),
+        leading=14,
+    )
+
     # Encabezado
-    elementos.append(Paragraph("🍦 Helarte - Reporte Diario", titulo_style))
-    elementos.append(Paragraph(f"Fecha: {fecha.strftime('%d/%m/%Y')}", subtitulo_style))
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'img', 'logo.png')
+    if os.path.exists(logo_path):
+        logo = Image(logo_path, width=0.9 * inch, height=0.9 * inch)
+        logo.hAlign = 'CENTER'
+        elementos.append(logo)
+        elementos.append(Spacer(1, 0.08 * inch))
+
+    elementos.append(Paragraph("Helarte · Reporte Diario", titulo_style))
+    elementos.append(Paragraph(
+        f"Fecha operativa: {fecha.strftime('%d/%m/%Y')} · Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        subtitulo_style
+    ))
+
+    indicadores_data = [[
+        Paragraph(f"<b>Total ventas</b><br/>${sum(v.total for v in ventas):.2f}", indicador_style),
+        Paragraph(f"<b>Tickets emitidos</b><br/>{len(ventas)}", indicador_style),
+        Paragraph(f"<b>Ticket promedio</b><br/>${(sum(v.total for v in ventas) / len(ventas)) if ventas else 0:.2f}", indicador_style),
+    ]]
+    tabla_indicadores = Table(indicadores_data, colWidths=[2.1 * inch, 2.1 * inch, 2.1 * inch])
+    tabla_indicadores.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#f3f4f6')),
+        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e5e7eb')),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 9),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 9),
+    ]))
+    elementos.append(tabla_indicadores)
+    elementos.append(Spacer(1, 0.22 * inch))
 
     # RESUMEN GENERAL
     elementos.append(Paragraph("📊 Resumen General", encabezado_style))
@@ -205,6 +261,46 @@ def generar_pdf_fecha(fecha):
     elementos.append(tabla_caja)
     elementos.append(Spacer(1, 0.3*inch))
 
+    # DESGLOSE POR MEDIO DE PAGO
+    elementos.append(Paragraph("💳 Desglose por Forma de Pago", encabezado_style))
+    datos_pago = [
+        ['Forma de pago', 'Monto'],
+        ['Efectivo', f'${float(caja.total_efectivo or 0):.2f}'],
+        ['Transferencia', f'${float(caja.total_transferencia or 0):.2f}'],
+    ]
+    tabla_pago = Table(datos_pago, colWidths=[3.5 * inch, 2.5 * inch])
+    tabla_pago.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#fcfcf9'), colors.HexColor('#ffffff')]),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#5e5240')),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elementos.append(tabla_pago)
+    elementos.append(Spacer(1, 0.22 * inch))
+
+    if top_productos:
+        elementos.append(Paragraph("🏆 Top 5 Productos del Día", encabezado_style))
+        datos_top = [['Producto', 'Unidades vendidas']]
+        for item in top_productos:
+            datos_top.append([item.nombre, str(int(item.cantidad))])
+        tabla_top = Table(datos_top, colWidths=[4.3 * inch, 1.7 * inch])
+        tabla_top.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#5e5240')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#fcfcf9'), colors.HexColor('#ffffff')]),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        elementos.append(tabla_top)
+        elementos.append(Spacer(1, 0.22 * inch))
+
     # DETALLE DE EGRESOS
     if egresos:
         elementos.append(Paragraph("📝 Detalle de Egresos", encabezado_style))
@@ -262,6 +358,8 @@ def generar_pdf_fecha(fecha):
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#fcfcf9'), colors.HexColor('#ffffff')])
         ]))
         elementos.append(tabla_comparacion)
+
+    elementos.append(Paragraph('Helarte · Reporte automático de cierre diario', foot_style))
 
     # Construir PDF
     doc.build(elementos)
