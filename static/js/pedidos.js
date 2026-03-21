@@ -324,6 +324,11 @@ function renderizarPedidosActivos(pedidos) {
                    <i class="bi bi-check-lg"></i> Marcar Entregado
                </button>`;
 
+        const botonTicket = `
+            <button class="btn btn-sm btn-outline-dark" onclick="imprimirTicketPedido(${p.id})">
+                <i class="bi bi-printer"></i> Ticket
+            </button>`;
+
         return `
             <div class="list-group-item py-2">
                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -339,11 +344,16 @@ function renderizarPedidosActivos(pedidos) {
                         </div>
                     </div>
                     <div class="d-flex gap-1">
+                        ${botonTicket}
                         ${botonesEstado}
                     </div>
                 </div>
             </div>`;
     }).join('');
+}
+
+function imprimirTicketPedido(pedidoId) {
+    window.open(`/pedidos/${pedidoId}/ticket`, '_blank');
 }
 
 async function cambiarEstado(pedidoId, nuevoEstado) {
