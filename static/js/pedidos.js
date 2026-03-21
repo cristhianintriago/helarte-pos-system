@@ -313,16 +313,19 @@ function renderizarPedidosActivos(pedidos) {
             ? `<span class="badge bg-light text-dark border">🔀 Mixto #${p.numero_comprobante || '—'}</span>`
             : '';
 
-        const botonesEstado = p.estado === 'pendiente'
-            ? `<button class="btn btn-sm btn-primary me-1" onclick="cambiarEstado(${p.id}, 'en_proceso')">
-                   <i class="bi bi-play-fill"></i> Procesar
-               </button>
-               <button class="btn btn-sm btn-success" onclick="cambiarEstado(${p.id}, 'entregado')">
+        const botonesEstado = `<button class="btn btn-sm btn-success" onclick="cambiarEstado(${p.id}, 'entregado')">
                    <i class="bi bi-check-lg"></i> Entregado
-               </button>`
-            : `<button class="btn btn-sm btn-success" onclick="cambiarEstado(${p.id}, 'entregado')">
-                   <i class="bi bi-check-lg"></i> Marcar Entregado
                </button>`;
+
+        const botonTicket = `
+            <button class="btn btn-sm btn-outline-dark" onclick="imprimirTicketPedido(${p.id})">
+                <i class="bi bi-printer"></i> Ticket
+            </button>`;
+
+        const botonEliminar = `
+            <button class="btn btn-sm btn-outline-danger" onclick="eliminarPedido(${p.id})">
+                <i class="bi bi-trash"></i> Eliminar
+            </button>`;
 
         return `
             <div class="list-group-item py-2">
@@ -339,11 +342,43 @@ function renderizarPedidosActivos(pedidos) {
                         </div>
                     </div>
                     <div class="d-flex gap-1">
+                        ${botonTicket}
+                        ${botonEliminar}
                         ${botonesEstado}
                     </div>
                 </div>
             </div>`;
     }).join('');
+}
+
+function imprimirTicketPedido(pedidoId) {
+    window.open(`/pedidos/${pedidoId}/ticket`, '_blank');
+}
+
+async function eliminarPedido(pedidoId) {
+    const confirmar = confirm('Este pedido se eliminará de la cola. ¿Deseas continuar?');
+    if (!confirmar) return;
+
+    try {
+        const respuesta = await fetch(`/pedidos/${pedidoId}`, {
+            method: 'DELETE'
+        });
+
+        let datos = {};
+        const contentType = respuesta.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            datos = await respuesta.json();
+        }
+
+        if (respuesta.ok) {
+            mostrarToast('Pedido eliminado correctamente', 'success');
+            cargarPedidosActivos();
+        } else {
+            mostrarToast(datos.error || 'No se pudo eliminar el pedido', 'warning');
+        }
+    } catch (error) {
+        mostrarToast('Error de conexión al eliminar pedido', 'danger');
+    }
 }
 
 async function cambiarEstado(pedidoId, nuevoEstado) {

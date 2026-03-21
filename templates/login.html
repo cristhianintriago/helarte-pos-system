@@ -86,6 +86,43 @@
       padding: 1rem;
     }
 
+    .fx-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(0.2px);
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.45;
+    }
+
+    .fx-orb-a {
+      width: 140px;
+      height: 140px;
+      right: 10%;
+      top: 16%;
+      background: radial-gradient(circle at 30% 30%, rgba(255, 126, 184, 0.45), rgba(255, 126, 184, 0.04));
+      animation: floatOrbA 7s ease-in-out infinite;
+    }
+
+    .fx-orb-b {
+      width: 100px;
+      height: 100px;
+      left: 11%;
+      bottom: 10%;
+      background: radial-gradient(circle at 30% 30%, rgba(49, 208, 181, 0.42), rgba(49, 208, 181, 0.05));
+      animation: floatOrbB 8.5s ease-in-out infinite;
+    }
+
+    @keyframes floatOrbA {
+      0%, 100% { transform: translateY(0) translateX(0); }
+      50% { transform: translateY(-16px) translateX(10px); }
+    }
+
+    @keyframes floatOrbB {
+      0%, 100% { transform: translateY(0) translateX(0); }
+      50% { transform: translateY(12px) translateX(-12px); }
+    }
+
     .login-card {
       background: rgba(255,255,255,0.92);
       backdrop-filter: blur(14px);
@@ -95,11 +132,51 @@
       box-shadow: 0 8px 40px rgba(255,126,184,0.15), 0 2px 12px rgba(0,0,0,0.06);
       padding: 2.6rem 2.2rem 2.2rem;
       animation: cardEntrada 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      position: relative;
+      overflow: hidden;
+      transform-style: preserve-3d;
+      transition: transform 0.26s ease, box-shadow 0.26s ease, opacity 0.4s;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: -60%;
+      left: -20%;
+      width: 60%;
+      height: 220%;
+      background: linear-gradient(90deg, transparent, rgba(255,126,184,0.14), transparent);
+      transform: rotate(14deg);
+      animation: sweep 6s linear infinite;
+      pointer-events: none;
+    }
+
+    @keyframes sweep {
+      0% { transform: translateX(-120%) rotate(14deg); }
+      100% { transform: translateX(340%) rotate(14deg); }
     }
 
     @keyframes cardEntrada {
       from { opacity: 0; transform: translateY(32px) scale(0.96); }
       to   { opacity: 1; transform: translateY(0)    scale(1); }
+    }
+
+    .reveal-item {
+      opacity: 0;
+      transform: translateY(14px);
+      animation: revealUp 0.55s ease forwards;
+    }
+
+    .reveal-delay-1 { animation-delay: 0.06s; }
+    .reveal-delay-2 { animation-delay: 0.14s; }
+    .reveal-delay-3 { animation-delay: 0.22s; }
+    .reveal-delay-4 { animation-delay: 0.3s; }
+
+    @keyframes revealUp {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     /* ── Logo + título ── */
@@ -142,6 +219,34 @@
       margin-top: 2px;
     }
 
+    .login-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.45rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,126,184,0.16), rgba(49,208,181,0.14));
+      color: #304151;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #31D0B5;
+      box-shadow: 0 0 0 0 rgba(49,208,181,0.7);
+      animation: pulseDot 1.8s infinite;
+    }
+
+    @keyframes pulseDot {
+      0% { box-shadow: 0 0 0 0 rgba(49,208,181,0.7); }
+      80% { box-shadow: 0 0 0 9px rgba(49,208,181,0); }
+      100% { box-shadow: 0 0 0 0 rgba(49,208,181,0); }
+    }
+
     /* ── Formulario ── */
     .form-label {
       font-weight: 700;
@@ -158,6 +263,13 @@
       border-right: none;
       color: var(--rosa-dark);
       border-radius: 10px 0 0 10px;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+
+    .input-group:focus-within .input-group-text {
+      background: rgba(255, 126, 184, 0.18);
+      border-color: var(--rosa);
+      color: var(--rosa-dark);
     }
 
     .form-control {
@@ -251,6 +363,22 @@
       animation: spinIcon 0.7s linear infinite;
     }
 
+    .btn-login .shine {
+      position: absolute;
+      top: 0;
+      left: -140%;
+      width: 70%;
+      height: 100%;
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,0.46), transparent);
+      transform: skewX(-20deg);
+      transition: left 0.65s ease;
+      pointer-events: none;
+    }
+
+    .btn-login:hover .shine {
+      left: 160%;
+    }
+
     @keyframes spinIcon {
       from { transform: rotate(0deg); }
       to   { transform: rotate(360deg); }
@@ -281,11 +409,96 @@
       color: var(--texto-sec);
       font-size: 0.78rem;
       margin-top: 1.4rem;
+      letter-spacing: 0.2px;
     }
 
     .login-footer span {
       color: var(--rosa);
       font-weight: 700;
+    }
+
+    .footer-heart {
+      display: inline-block;
+      color: #ff4fa0;
+      margin: 0 0.15rem;
+      text-shadow: 0 0 8px rgba(255, 79, 160, 0.45);
+      animation: heartTwinkle 1.8s ease-in-out infinite;
+    }
+
+    @keyframes heartTwinkle {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.12); filter: brightness(1.18); }
+    }
+
+    .trust-strip {
+      margin-top: 0.9rem;
+      display: flex;
+      justify-content: center;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .login-tools {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: -0.55rem;
+      margin-bottom: 1rem;
+      font-size: 0.78rem;
+      color: var(--texto-sec);
+    }
+
+    .login-tools .form-check-input {
+      border-color: #d2d8dd;
+    }
+
+    .login-tools .form-check-input:checked {
+      background-color: var(--rosa-dark);
+      border-color: var(--rosa-dark);
+    }
+
+    .caps-lock-warning {
+      display: none;
+      color: #b45309;
+      font-weight: 700;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      padding: 0.16rem 0.42rem;
+      white-space: nowrap;
+    }
+
+    .trust-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #3f4f59;
+      border: 1px solid rgba(255, 126, 184, 0.25);
+      background: rgba(255, 255, 255, 0.72);
+      border-radius: 999px;
+      padding: 0.22rem 0.58rem;
+      backdrop-filter: blur(3px);
+      animation: floatPill 3.8s ease-in-out infinite;
+    }
+
+    .trust-pill:nth-child(2) {
+      animation-delay: 0.35s;
+    }
+
+    .trust-pill:nth-child(3) {
+      animation-delay: 0.7s;
+    }
+
+    @keyframes floatPill {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+      }
     }
   </style>
 </head>
@@ -294,13 +507,15 @@
   <!-- Fondo animado (patrón de helados) -->
   <div class="bg-pattern"></div>
   <div class="bg-overlay"></div>
+  <div class="fx-orb fx-orb-a"></div>
+  <div class="fx-orb fx-orb-b"></div>
 
   <!-- Card de login -->
   <div class="login-wrapper">
     <div class="login-card">
 
       <!-- Logo -->
-      <div class="text-center mb-4">
+      <div class="text-center mb-4 reveal-item reveal-delay-1">
         <div class="logo-ring">
           <img src="{{ url_for('static', filename='img/logo.png') }}"
                alt="Helarte Logo"
@@ -308,6 +523,10 @@
         </div>
         <h1 class="login-title mt-2">Helarte</h1>
         <p class="login-subtitle">Sistema de gestión · Inicia sesión</p>
+        <div class="login-status">
+          <span class="status-dot"></span>
+          <span id="status-text">Acceso seguro activo</span>
+        </div>
       </div>
 
       <!-- Flash Messages -->
@@ -323,7 +542,7 @@
       <form method="POST" id="login-form" novalidate>
 
         <!-- Usuario -->
-        <div class="mb-3">
+        <div class="mb-3 reveal-item reveal-delay-2">
           <label class="form-label" for="username-input">Usuario</label>
           <div class="input-group">
             <span class="input-group-text">
@@ -341,7 +560,7 @@
         </div>
 
         <!-- Contraseña -->
-        <div class="mb-4">
+        <div class="mb-4 reveal-item reveal-delay-3">
           <label class="form-label" for="password-input">Contraseña</label>
           <div class="input-group">
             <span class="input-group-text">
@@ -361,15 +580,30 @@
           </div>
         </div>
 
+        <div class="login-tools reveal-item reveal-delay-3">
+          <div class="form-check m-0">
+            <input class="form-check-input" type="checkbox" id="remember-user">
+            <label class="form-check-label" for="remember-user">Recordar usuario</label>
+          </div>
+          <span class="caps-lock-warning" id="caps-lock-warning">Bloq Mayús activado</span>
+        </div>
+
         <!-- Botón de ingreso -->
-        <button type="submit" class="btn-login" id="btn-login">
+        <button type="submit" class="btn-login reveal-item reveal-delay-4" id="btn-login">
+          <span class="shine"></span>
           <i class="bi bi-box-arrow-in-right" id="login-icon"></i>
           <span id="login-label"> Ingresar</span>
         </button>
+
+        <div class="trust-strip reveal-item reveal-delay-4">
+          <span class="trust-pill">Seguro</span>
+          <span class="trust-pill">Rápido</span>
+          <span class="trust-pill">Helarte</span>
+        </div>
       </form>
 
       <div class="login-footer">
-        <span>Helarte</span> &copy; {{ 2026 }} · Todos los derechos reservados
+        Desarrollado con <span class="footer-heart">💖</span> por Cris > Versión 1.0.0
       </div>
 
     </div>
@@ -382,8 +616,19 @@
     // 1. Toggle: mostrar / ocultar contraseña (ojito)
     // ──────────────────────────────────────────────
     const btnOjo    = document.getElementById('btn-ojo');
+    const userInput = document.getElementById('username-input');
     const passInput = document.getElementById('password-input');
     const eyeIcon   = document.getElementById('eye-icon');
+    const loginCard = document.querySelector('.login-card');
+    const rememberUser = document.getElementById('remember-user');
+    const capsWarning = document.getElementById('caps-lock-warning');
+
+    // Recordar usuario en este navegador
+    const savedUser = localStorage.getItem('helarte_last_user');
+    if (savedUser) {
+      userInput.value = savedUser;
+      rememberUser.checked = true;
+    }
 
     btnOjo.addEventListener('click', () => {
       const visible = passInput.type === 'text';
@@ -406,6 +651,14 @@
       }
     });
 
+    // Aviso de Bloq Mayús para evitar errores de tipeo
+    passInput.addEventListener('keyup', (e) => {
+      capsWarning.style.display = e.getModifierState('CapsLock') ? 'inline-flex' : 'none';
+    });
+    passInput.addEventListener('blur', () => {
+      capsWarning.style.display = 'none';
+    });
+
     // ──────────────────────────────────────────────
     // 3. Animación al hacer submit (spinner en botón)
     // ──────────────────────────────────────────────
@@ -413,6 +666,12 @@
       const btn   = document.getElementById('btn-login');
       const icon  = document.getElementById('login-icon');
       const label = document.getElementById('login-label');
+
+      if (rememberUser.checked) {
+        localStorage.setItem('helarte_last_user', userInput.value.trim());
+      } else {
+        localStorage.removeItem('helarte_last_user');
+      }
 
       btn.classList.add('loading');
       icon.className = 'bi bi-arrow-repeat';
@@ -424,6 +683,44 @@
         document.querySelector('.login-card').style.opacity = '0.7';
       }, 300);
     });
+
+    // ──────────────────────────────────────────────
+    // 4. Mensaje dinámico de estado
+    // ──────────────────────────────────────────────
+    const statusText = document.getElementById('status-text');
+    const states = [
+      'Acceso seguro activo',
+      'Sesión cifrada',
+      'Sistema listo para operar'
+    ];
+    let idx = 0;
+
+    setInterval(() => {
+      idx = (idx + 1) % states.length;
+      statusText.style.opacity = '0';
+      setTimeout(() => {
+        statusText.textContent = states[idx];
+        statusText.style.opacity = '1';
+      }, 160);
+    }, 2400);
+
+    // ──────────────────────────────────────────────
+    // 5. Efecto de inclinación suave al mover el mouse
+    // ──────────────────────────────────────────────
+    if (window.matchMedia('(prefers-reduced-motion: no-preference)').matches && loginCard) {
+      loginCard.addEventListener('mousemove', (e) => {
+        const rect = loginCard.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const rx = ((y / rect.height) - 0.5) * -3.5;
+        const ry = ((x / rect.width) - 0.5) * 4.5;
+        loginCard.style.transform = `perspective(900px) rotateX(${rx}deg) rotateY(${ry}deg) translateY(-1px)`;
+      });
+
+      loginCard.addEventListener('mouseleave', () => {
+        loginCard.style.transform = 'perspective(900px) rotateX(0) rotateY(0) translateY(0)';
+      });
+    }
   </script>
 </body>
 </html>
