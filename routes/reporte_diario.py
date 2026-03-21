@@ -42,7 +42,7 @@ def listar_historial():
     hace_30_dias = date.today() - timedelta(days=30)
     
     cajas = Caja.query.filter(
-        db.func.date(Caja.fecha) >= hace_30_dias
+        db.cast(Caja.fecha, db.Date) >= hace_30_dias
     ).order_by(Caja.fecha.desc()).all()
     
     return jsonify([{
@@ -64,7 +64,7 @@ def generar_pdf_fecha(fecha):
 
     # Caja del día
     caja = Caja.query.filter(
-        db.func.date(Caja.fecha) == fecha
+        db.cast(Caja.fecha, db.Date) == fecha
     ).first()
 
     if not caja:
@@ -112,7 +112,7 @@ def generar_pdf_fecha(fecha):
     # Comparación con día anterior
     dia_anterior = fecha - timedelta(days=1)
     caja_anterior = Caja.query.filter(
-        db.func.date(Caja.fecha) == dia_anterior
+        db.cast(Caja.fecha, db.Date) == dia_anterior
     ).first()
 
     # 2. Crear PDF

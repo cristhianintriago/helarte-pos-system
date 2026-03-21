@@ -41,13 +41,13 @@ def obtener_reporte():
     total_vendido = sum(v.total for v in ventas)
 
     ventas_por_dia = db.session.query(
-        func.date(Venta.fecha).label('fecha'),
+        db.cast(Venta.fecha, db.Date).label('fecha'),
         func.count(Venta.id).label('cantidad'),
         func.sum(Venta.total).label('total')
     ).filter(
         Venta.fecha >= desde,
         Venta.fecha <= hasta
-    ).group_by(func.date(Venta.fecha)).order_by(func.date(Venta.fecha).desc()).all()
+    ).group_by(db.cast(Venta.fecha, db.Date)).order_by(db.cast(Venta.fecha, db.Date).desc()).all()
 
     top_productos = db.session.query(
         Producto.nombre,

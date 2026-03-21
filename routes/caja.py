@@ -16,7 +16,7 @@ def abrir_caja():
 
     hoy = date.today()
     caja_hoy = Caja.query.filter(
-        db.func.date(Caja.fecha) == hoy
+        db.cast(Caja.fecha, db.Date) == hoy
     ).first()
 
     if caja_hoy:
@@ -99,7 +99,7 @@ def reiniciar_caja():
     if not caja:
         # Si está cerrada, la reabrimos y reiniciamos sus contadores
         hoy = date.today()
-        caja = Caja.query.filter(db.func.date(Caja.fecha) == hoy).first()
+        caja = Caja.query.filter(db.cast(Caja.fecha, db.Date) == hoy).first()
         if not caja:
             return jsonify({'error': 'No hay caja registrada hoy'}), 404
         caja.estado = 'abierta'
@@ -116,7 +116,7 @@ def reiniciar_caja():
 
     # Eliminamos también las ventas del día para que el módulo de Ventas quede limpio
     hoy = date.today()
-    ventas_hoy = Venta.query.filter(db.func.date(Venta.fecha) == hoy).all()
+    ventas_hoy = Venta.query.filter(db.cast(Venta.fecha, db.Date) == hoy).all()
     for v in ventas_hoy:
         db.session.delete(v)
 
@@ -155,7 +155,7 @@ def obtener_egresos():
     # ✅ Busca por la caja de HOY sin importar si está abierta o cerrada
     hoy = date.today()
     caja = Caja.query.filter(
-        db.func.date(Caja.fecha) == hoy
+        db.cast(Caja.fecha, db.Date) == hoy
     ).first()
 
     if not caja:
@@ -176,7 +176,7 @@ def historial_cajas():
 
     cajas = Caja.query.filter(
         Caja.estado == 'cerrada',
-        db.func.date(Caja.fecha) >= hace_30_dias
+        db.cast(Caja.fecha, db.Date) >= hace_30_dias
     ).order_by(Caja.fecha.desc()).all()
 
     return jsonify([{
@@ -222,7 +222,7 @@ def eliminar_registros_caja():
         # Eliminamos las ventas del día de esta caja
         fecha_caja = caja.fecha.date()
         ventas_del_dia = Venta.query.filter(
-            db.func.date(Venta.fecha) == fecha_caja
+            db.cast(Venta.fecha, db.Date) == fecha_caja
         ).all()
         for v in ventas_del_dia:
             db.session.delete(v)
