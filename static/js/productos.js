@@ -1,3 +1,4 @@
+// Estado en memoria para gestion del catalogo y sabores.
 let todosLosProductos = [];
 let todosLosSabores = [];
 let idAEliminar = null;
@@ -5,11 +6,13 @@ let categoriaActual = "todas";
 
 document.addEventListener("DOMContentLoaded", iniciarPantallaProductos);
 
+// Bootstrap de la vista: enlaza UI y carga datos iniciales.
 async function iniciarPantallaProductos() {
   enlazarEventosUI();
   await Promise.all([cargarSabores(), cargarProductos()]);
 }
 
+// Registra listeners de filtros y ciclo del modal.
 function enlazarEventosUI() {
   const buscador = document.getElementById("buscador-productos");
   if (buscador) {
@@ -39,6 +42,7 @@ async function cargarProductos() {
   }
 }
 
+// Catalogo de sabores reutilizado en gestion y en selector de producto.
 async function cargarSabores() {
   try {
     const respuesta = await fetch("/productos/sabores");
@@ -55,6 +59,7 @@ async function cargarSabores() {
   }
 }
 
+// Construye botones de categoria dinamicos.
 function renderizarFiltros() {
   const categorias = [...new Set(todosLosProductos.map((p) => p.categoria))];
   const contenedor = document.getElementById("filtros");
@@ -105,6 +110,7 @@ function filtrar(categoria, event) {
   aplicarFiltros();
 }
 
+// Tabla principal para escritorio.
 function renderizarTabla(productos) {
   const tbody = document.getElementById("tabla-productos");
   if (!tbody) return;
@@ -210,6 +216,7 @@ function renderizarTarjetasMovil(productos) {
   });
 }
 
+// Gestion de sabores activos en chips de administracion.
 function renderizarSaboresGestion() {
   const contenedor = document.getElementById("lista-sabores");
   if (!contenedor) return;
@@ -262,6 +269,7 @@ function renderizarSelectorSabores(saborIdsSeleccionados = []) {
   });
 }
 
+// Utilidades de seleccion masiva en modal.
 function seleccionarTodosSabores() {
   document.querySelectorAll("#selector-sabores input[type='checkbox']").forEach((check) => {
     check.checked = true;
@@ -304,6 +312,7 @@ async function crearSabor() {
   }
 }
 
+// Baja logica: conserva historial y evita borrado fisico de sabor.
 async function desactivarSabor(saborId) {
   try {
     const respuesta = await fetch(`/productos/sabores/${saborId}`, {
@@ -352,6 +361,7 @@ function limpiarModal() {
   renderizarSelectorSabores([]);
 }
 
+// Carga datos actuales del producto en formulario de edicion.
 function abrirEditar(id) {
   const producto = todosLosProductos.find((p) => p.id === id);
   if (!producto) return;
@@ -426,6 +436,7 @@ async function guardarProducto() {
       imagen_url = uploadData.imagen_url;
     }
 
+    // Contrato JSON esperado por endpoints de productos.
     const datos = { nombre, categoria, precio, disponible, imagen_url, sabor_ids, max_sabores };
     const url = id ? `/productos/${id}` : "/productos/";
     const metodo = id ? "PUT" : "POST";
@@ -477,6 +488,7 @@ async function toggleDisponible(id, disponible) {
   }
 }
 
+// Flujo de confirmacion para eliminar desde modal.
 function abrirEliminar(id, nombre) {
   idAEliminar = id;
   document.getElementById("nombre-eliminar").textContent = nombre;

@@ -11,6 +11,7 @@ producto_sabores = db.Table(
     db.Column('producto_id', db.Integer, db.ForeignKey('productos.id'), primary_key=True),
     db.Column('sabor_id', db.Integer, db.ForeignKey('sabores.id'), primary_key=True)
 )
+# Relacion N:N: un producto puede tener multiples sabores y cada sabor pertenecer a multiples productos.
 
 
 # ==========================================
@@ -149,5 +150,6 @@ class Egreso(db.Model):
 class ConfiguracionSistema(db.Model):
     __tablename__ = 'configuracion_sistema'
 
+    # Tabla llave-valor para parametros operativos sin migrar esquema completo.
     clave = db.Column(db.String(80), primary_key=True)
     valor_entero = db.Column(db.Integer, nullable=True)

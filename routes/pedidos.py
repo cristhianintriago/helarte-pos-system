@@ -15,6 +15,9 @@ import os
 pedidos_bp = Blueprint('pedidos', __name__, url_prefix='/pedidos')
 
 
+# ==========================================
+# HELPERS DE NUMERACION VISUAL DE TICKETS
+# ==========================================
 def _calcular_siguiente_numero_pedido():
     config = _obtener_o_inicializar_contador_tickets()
     return int(config.valor_entero or 1)
@@ -38,6 +41,7 @@ def _obtener_o_inicializar_contador_tickets():
 def _avanzar_contador_tickets():
     config = _obtener_o_inicializar_contador_tickets()
     actual = int(config.valor_entero or 1)
+    # Contador circular 1..50 para numeracion visual diaria.
     config.valor_entero = (actual % 50) + 1
     db.session.add(config)
 
@@ -54,6 +58,9 @@ def _obtener_ticket_path(pedido_id):
     return os.path.join(tickets_dir, f'ticket_pedido_{pedido_id}.pdf')
 
 
+# ==========================================
+# HELPERS DE TICKET PDF
+# ==========================================
 def _construir_ticket_pdf(pedido):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -94,6 +101,7 @@ def _construir_ticket_pdf(pedido):
     elementos.append(Paragraph('Helarte', titulo_style))
     elementos.append(Paragraph('Ticket de Pedido', sub_style))
 
+    # Bloque de metadatos del ticket.
     encabezado = [
         ['Ticket #', f'{_numero_visual_pedido(pedido)}'],
         ['Fecha', pedido.fecha.strftime('%d/%m/%Y %H:%M')],
@@ -118,6 +126,7 @@ def _construir_ticket_pdf(pedido):
     elementos.append(tabla_info)
     elementos.append(Spacer(1, 0.16 * inch))
 
+    # Tabla de items del pedido para impresion.
     data_items = [['Producto', 'Cant.', 'P. Unit.', 'Subtotal']]
     for d in pedido.detalles:
         nombre_producto = d.producto.nombre
@@ -239,7 +248,7 @@ def crear_pedido():
     db.session.add(nuevo_pedido)
     db.session.flush()  # flush() asigna el ID sin hacer commit aún
 
-    # Procesamos cada producto del pedido
+    # Procesamos cada producto del pedido y validamos reglas de sabores.
     total = 0
     for item in datos['productos']:
         producto = Producto.query.get(item['producto_id'])
@@ -255,6 +264,7 @@ def crear_pedido():
 
         sabores_seleccionados = [str(s).strip() for s in sabores_seleccionados if str(s).strip()]
 
+        # sabores_permitidos representa el catalogo activo por producto.
         sabores_permitidos = {s.nombre for s in producto.sabores if s.activo}
         max_sabores = int(producto.max_sabores or 1)
 
@@ -286,7 +296,7 @@ def crear_pedido():
     # Actualizamos el total general del pedido a nivel de la cabecera
     nuevo_pedido.total = total
     
-    # Validar montos para pagos mixtos asegurando que la suma de efectivo y transferencia coincida con el total
+    # Validar montos para pagos mixtos asegurando que la suma coincida con el total.
     if forma_pago == 'mixto':
         if not datos.get('numero_comprobante'):
             return jsonify({'error': 'El número de comprobante es requerido para pagos mixtos'}), 400
@@ -354,7 +364,7 @@ def cambiar_estado(pedido_id):
 
     pedido.estado = nuevo_estado
 
-    # Si el pedido fue entregado, registramos la venta y actualizamos la caja
+    # Si el pedido fue entregado, registramos la venta y actualizamos caja abierta.
     if nuevo_estado == 'entregado':
         venta = Venta(
             pedido_id=pedido.id,

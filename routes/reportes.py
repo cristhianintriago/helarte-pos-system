@@ -9,6 +9,9 @@ import csv
 reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 
 
+# ==========================================
+# HELPERS DE RANGO Y CONSULTA
+# ==========================================
 def _rango_fechas(desde_str, hasta_str):
     """Normaliza rango de fechas; si no se envía, usa el día actual."""
     hoy = date.today()
@@ -33,6 +36,7 @@ def obtener_reporte():
 
     desde, hasta = _rango_fechas(desde_str, hasta_str)
 
+    # Ventas detalladas para metricas de resumen.
     ventas = Venta.query.filter(
         Venta.fecha >= desde,
         Venta.fecha <= hasta
@@ -40,6 +44,7 @@ def obtener_reporte():
 
     total_vendido = sum(v.total for v in ventas)
 
+    # Serie temporal agregada para graficos del dashboard.
     ventas_por_dia = db.session.query(
         db.cast(Venta.fecha, db.Date).label('fecha'),
         func.count(Venta.id).label('cantidad'),
@@ -49,6 +54,7 @@ def obtener_reporte():
         Venta.fecha <= hasta
     ).group_by(db.cast(Venta.fecha, db.Date)).order_by(db.cast(Venta.fecha, db.Date).desc()).all()
 
+    # Ranking de productos mas vendidos en el rango.
     top_productos = db.session.query(
         Producto.nombre,
         func.sum(DetallePedido.cantidad).label('cantidad')
@@ -100,6 +106,7 @@ def dashboard_hoy():
 
 
 def _obtener_ventas_rango(desde_str, hasta_str):
+    # Reutilizado por exportadores para mantener filtros consistentes.
     desde, hasta = _rango_fechas(desde_str, hasta_str)
     ventas = Venta.query.filter(
         Venta.fecha >= desde,
@@ -111,6 +118,7 @@ def _obtener_ventas_rango(desde_str, hasta_str):
 @reportes_bp.route('/export/csv', methods=['GET'])
 @login_required
 def exportar_csv():
+    # Export plano para integraciones y auditoria externa.
     ventas, desde, hasta = _obtener_ventas_rango(request.args.get('desde'), request.args.get('hasta'))
 
     output = StringIO()
@@ -138,6 +146,7 @@ def exportar_csv():
 @reportes_bp.route('/export/excel', methods=['GET'])
 @login_required
 def exportar_excel():
+    # Export enriquecido para analisis operativo en hojas de calculo.
     ventas, desde, hasta = _obtener_ventas_rango(request.args.get('desde'), request.args.get('hasta'))
 
     try:

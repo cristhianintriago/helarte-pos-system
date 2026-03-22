@@ -34,6 +34,11 @@ from flask_limiter.util import get_remote_address
 from sqlalchemy import inspect, text
 
 
+# ==========================================
+# CONFIGURACION CENTRAL DE APLICACION
+# ==========================================
+
+
 # Se instancia la aplicación de Flask, esto será el núcleo de nuestro proyecto
 app = Flask(__name__)
 
@@ -109,12 +114,14 @@ def _agregar_columna_si_falta(table_name, column_name, ddl):
     if column_name in columnas:
         return
 
+    # Solo agrega columnas faltantes; no altera ni elimina estructura existente.
     db.session.execute(text(ddl))
     db.session.commit()
     print(f"Migracion aplicada: {table_name}.{column_name}")
 
 
 def _sincronizar_esquema_legacy():
+    # Mantiene compatibilidad con BDs antiguas en despliegues sin migraciones formales.
     # Migraciones aditivas necesarias cuando el despliegue usa una BD previa a estos campos.
     _agregar_columna_si_falta('productos', 'imagen_url', 'ALTER TABLE productos ADD COLUMN imagen_url VARCHAR(500)')
     _agregar_columna_si_falta('productos', 'max_sabores', 'ALTER TABLE productos ADD COLUMN max_sabores INTEGER')
@@ -144,6 +151,7 @@ def _crear_sabores_default():
     if Sabor.query.count() > 0:
         return
 
+    # Seeder idempotente: solo ejecuta cuando la tabla de sabores esta vacia.
     defaults = ['Vainilla', 'Chocolate', 'Fresa', 'Oreo', 'Mora', 'Ron Pasas']
     for nombre in defaults:
         db.session.add(Sabor(nombre=nombre, activo=True))

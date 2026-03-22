@@ -1,3 +1,4 @@
+// Estado en memoria de la pantalla de pedidos; se sincroniza al confirmar/cargar.
 let pedidoActual = {
     tipo: 'local',
     productos: []
@@ -11,6 +12,7 @@ let siguienteNumeroPedido = 1;
 const tapTimers = new Map();
 const TAP_DELAY_MS = 260;
 
+// Bootstrap inicial: catalogo, pedidos activos y numerador visual.
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('buscador-carta')?.addEventListener('input', aplicarFiltrosCatalogo);
 
@@ -38,6 +40,7 @@ async function cargarSiguienteNumeroPedido() {
     }
 }
 
+// Refresca ambas etiquetas (pantalla principal y modal checkout).
 function actualizarEtiquetaNumeroPedido() {
     const etiquetas = [
         document.getElementById('numero-pedido-actual'),
@@ -65,6 +68,7 @@ async function cargarProductos() {
     }
 }
 
+// Renderiza filtros dinamicos por categoria segun catalogo recibido.
 function renderizarFiltros(productos) {
     const categorias = [...new Set(productos.map((p) => p.categoria))];
     const contenedor = document.getElementById('filtros');
@@ -117,6 +121,7 @@ function aplicarFiltrosCatalogo() {
     renderizarProductos(productos);
 }
 
+// Dibuja tarjetas de producto respetando disponibilidad y soporte de sabores.
 function renderizarProductos(productos) {
     const contenedor = document.getElementById('lista-productos');
     if (!contenedor) return;
@@ -176,6 +181,7 @@ function handleProductoTap(cardElement, id, nombre, precio) {
     tapTimers.set(key, newTimer);
 }
 
+// Tap simple abre flujo normal; doble tap aplica agregado rapido.
 function agregarProducto(id, nombre, precio, cardElement = null) {
     const producto = productosCatalogo.find((p) => p.id === id);
     const sabores = (producto?.sabores || []).map((s) => s.nombre);
@@ -205,6 +211,7 @@ function agregarProductoConSabor(id, nombre, precio, sabor, cardElement = null) 
     feedbackAgregar(cardElement);
 }
 
+// En productos con sabores, toma sugeridos para acelerar carga en caja.
 function agregarRapido(id, nombre, precio, cardElement = null) {
     const producto = productosCatalogo.find((p) => p.id === id);
     if (!producto) return;
@@ -263,6 +270,7 @@ function abrirModalSabor(item) {
     new bootstrap.Modal(document.getElementById('modal-sabor')).show();
 }
 
+// Aplica validaciones de seleccion antes de persistir sabor en el item.
 function confirmarSaborSeleccionado() {
     if (!itemPendienteSabor) return;
 
@@ -347,6 +355,7 @@ function actualizarCheckoutTotal(total) {
     }
 }
 
+// Resume total/items en la barra inferior movil.
 function actualizarResumenMovil(total, items) {
     const totalMobile = document.getElementById('total-pedido-mobile');
     const itemsMobile = document.getElementById('items-pedido-mobile');
@@ -411,6 +420,7 @@ function setTipo(tipo) {
     if (btnDelivery) btnDelivery.className = `btn btn-sm flex-fill ${tipo === 'delivery' ? 'btn-dark' : 'btn-outline-dark'}`;
 }
 
+// Controla visibilidad de campos extra segun forma de pago elegida.
 function setFormaPago(forma) {
     formaPagoActual = forma;
     ['efectivo', 'transferencia', 'mixto', 'pago_pedidosya'].forEach((f) => {
@@ -463,6 +473,7 @@ function limpiarPedido() {
     actualizarResumen();
 }
 
+// Evita doble envio mientras se confirma el pedido.
 function setConfirmandoPedido(loading) {
     const boton = document.getElementById('btn-confirmar-final');
     if (!boton) return;
@@ -515,6 +526,7 @@ async function confirmarPedido() {
 
     setConfirmandoPedido(true);
 
+    // Payload esperado por /pedidos/ conservando compatibilidad de sabores.
     const datos = {
         tipo: pedidoActual.tipo,
         cliente_nombre: nombre || 'Consumidor final',
@@ -574,6 +586,7 @@ async function cargarPedidosActivos() {
     }
 }
 
+// Render compartido para escritorio y movil.
 function renderizarPedidosActivos(pedidos) {
     const contenedores = [
         document.getElementById('lista-pedidos-activos'),
