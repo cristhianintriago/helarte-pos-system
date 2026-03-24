@@ -8,6 +8,7 @@ import re
 from sqlalchemy.exc import IntegrityError
 
 productos_bp = Blueprint('productos', __name__, url_prefix='/productos')
+_CATEGORIA_ARCHIVADA = '__archivado__'
 
 # ── Configuración de Cloudinary desde variables de entorno
 cloudinary.config(
@@ -42,7 +43,7 @@ def obtener_productos():
     Obtiene todos los productos de la base de datos utilizando SQLAlchemy (orm).
     Retorna un arreglo JSON listo para ser consumido por el frontend.
     """
-    productos = Producto.query.all()
+    productos = Producto.query.filter(Producto.categoria != _CATEGORIA_ARCHIVADA).all()
 
     resultado = []
     for p in productos:
@@ -205,12 +206,13 @@ def eliminar_producto(producto_id):
     ).count()
     if historial_registros > 0:
         # En productos con historial no hacemos borrado fisico para no romper reportes.
-        # Se aplica baja logica: queda inactivo y sin imagen para retirarlo del catalogo.
+        # Se aplica archivado logico: queda inactivo, sin imagen y oculto del catalogo/listados.
         producto.disponible = False
         producto.imagen_url = ''
+        producto.categoria = _CATEGORIA_ARCHIVADA
         db.session.commit()
         return jsonify({
-            'mensaje': f'"{nombre_producto}" tiene historial ({historial_registros} registros). Se dio de baja del catalogo y se retiró su imagen.'
+            'mensaje': f'"{nombre_producto}" tiene historial ({historial_registros} registros). Se eliminó del catálogo operativo.'
         }), 200
 
     try:
