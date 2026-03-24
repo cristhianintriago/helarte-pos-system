@@ -496,11 +496,24 @@ function abrirEliminar(id, nombre) {
 }
 
 async function confirmarEliminar() {
+  const modalEl = document.getElementById("modal-eliminar");
+  const cerrarModal = () => {
+    if (!modalEl) return;
+    const instancia = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+    instancia.hide();
+  };
+
   try {
     const respuesta = await fetch(`/productos/${idAEliminar}`, { method: "DELETE" });
-    const datos = await respuesta.json();
+    let datos = {};
 
-    bootstrap.Modal.getInstance(document.getElementById("modal-eliminar")).hide();
+    try {
+      datos = await respuesta.json();
+    } catch {
+      datos = {};
+    }
+
+    cerrarModal();
 
     if (respuesta.ok) {
       mostrarToast(datos.mensaje || "Producto eliminado", "success");
@@ -510,6 +523,7 @@ async function confirmarEliminar() {
     }
   } catch (error) {
     console.error(error);
-    mostrarToast("Error de conexion al eliminar producto", "danger");
+    cerrarModal();
+    mostrarToast("Error de conexión al eliminar producto", "danger");
   }
 }

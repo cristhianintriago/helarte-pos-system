@@ -4,6 +4,8 @@ from models.models import db, Producto, Sabor
 import cloudinary
 import cloudinary.uploader
 import os
+import re
+from sqlalchemy.exc import IntegrityError
 
 productos_bp = Blueprint('productos', __name__, url_prefix='/productos')
 
@@ -13,6 +15,22 @@ cloudinary.config(
     api_key=os.environ.get('CLOUDINARY_API_KEY'),
     api_secret=os.environ.get('CLOUDINARY_API_SECRET')
 )
+
+
+def _extraer_public_id_cloudinary(imagen_url):
+    """
+    Convierte URL de Cloudinary a public_id.
+    Ejemplo: .../upload/v123/helarte/abc.jpg -> helarte/abc
+    """
+    if not imagen_url or 'res.cloudinary.com' not in imagen_url:
+        return None
+
+    match = re.search(r'/upload/(?:v\d+/)?(.+)$', imagen_url)
+    if not match:
+        return None
+
+    ruta = match.group(1)
+    return re.sub(r'\.[a-zA-Z0-9]+$', '', ruta)
 
 
 # ==========================================
@@ -163,7 +181,12 @@ def actualizar_producto(producto_id):
 def eliminar_producto(producto_id):
     from models.models import DetallePedido, Pedido
 
+    if not current_user.puede_gestionar_productos():
+        return jsonify({'error': 'Se requiere rol de administrador o superior'}), 403
+
     producto = Producto.query.get_or_404(producto_id)
+    nombre_producto = producto.nombre
+    imagen_url_producto = producto.imagen_url
 
     pedidos_activos = db.session.query(DetallePedido).join(Pedido).filter(
         DetallePedido.producto_id == producto_id,
@@ -172,12 +195,31 @@ def eliminar_producto(producto_id):
 
     if pedidos_activos > 0:
         return jsonify({
-            'error': f'No se puede eliminar "{producto.nombre}" porque tiene {pedidos_activos} pedido(s) activo(s)'
+            'error': f'No se puede eliminar "{nombre_producto}" porque tiene {pedidos_activos} pedido(s) activo(s)'
         }), 400
 
-    db.session.delete(producto)
-    db.session.commit()
-    return jsonify({'mensaje': f'Producto "{producto.nombre}" eliminado'})
+    try:
+        db.session.delete(producto)
+        db.session.commit()
+
+        public_id = _extraer_public_id_cloudinary(imagen_url_producto)
+        if public_id:
+            try:
+                cloudinary.uploader.destroy(public_id, invalidate=True)
+            except Exception:
+                # La eliminacion en BD ya fue exitosa; no bloqueamos por Cloudinary.
+                pass
+
+        return jsonify({'mensaje': f'Producto "{nombre_producto}" eliminado'})
+
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            'error': f'No se puede eliminar "{nombre_producto}" porque tiene historial asociado (ventas o pedidos registrados).'
+        }), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Error interno al eliminar producto: {str(e)}'}), 500
 
 
 @productos_bp.route('/sabores', methods=['GET'])
