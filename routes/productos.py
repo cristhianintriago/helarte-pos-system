@@ -204,9 +204,14 @@ def eliminar_producto(producto_id):
         DetallePedido.producto_id == producto_id
     ).count()
     if historial_registros > 0:
+        # En productos con historial no hacemos borrado fisico para no romper reportes.
+        # Se aplica baja logica: queda inactivo y sin imagen para retirarlo del catalogo.
+        producto.disponible = False
+        producto.imagen_url = ''
+        db.session.commit()
         return jsonify({
-            'error': f'No se puede eliminar "{nombre_producto}" porque tiene {historial_registros} registro(s) en historial de pedidos/ventas.'
-        }), 400
+            'mensaje': f'"{nombre_producto}" tiene historial ({historial_registros} registros). Se dio de baja del catalogo y se retiró su imagen.'
+        }), 200
 
     try:
         # Limpiamos asociaciones N:N antes del delete para evitar bloqueos por FK
