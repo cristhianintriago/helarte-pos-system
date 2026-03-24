@@ -198,7 +198,22 @@ def eliminar_producto(producto_id):
             'error': f'No se puede eliminar "{nombre_producto}" porque tiene {pedidos_activos} pedido(s) activo(s)'
         }), 400
 
+    # Si existe historial (detalles ya vendidos/finalizados), no se elimina fisicamente
+    # para preservar reportes y consistencia de datos.
+    historial_registros = db.session.query(DetallePedido).filter(
+        DetallePedido.producto_id == producto_id
+    ).count()
+    if historial_registros > 0:
+        return jsonify({
+            'error': f'No se puede eliminar "{nombre_producto}" porque tiene {historial_registros} registro(s) en historial de pedidos/ventas.'
+        }), 400
+
     try:
+        # Limpiamos asociaciones N:N antes del delete para evitar bloqueos por FK
+        # cuando el producto tiene sabores vinculados.
+        producto.sabores = []
+        db.session.flush()
+
         db.session.delete(producto)
         db.session.commit()
 
@@ -215,7 +230,7 @@ def eliminar_producto(producto_id):
     except IntegrityError:
         db.session.rollback()
         return jsonify({
-            'error': f'No se puede eliminar "{nombre_producto}" porque tiene historial asociado (ventas o pedidos registrados).'
+            'error': f'No se puede eliminar "{nombre_producto}" por integridad de datos (relaciones asociadas).'
         }), 400
     except Exception as e:
         db.session.rollback()
