@@ -255,6 +255,18 @@ function abrirModalSabor(item) {
         if (navigator.vibrate) navigator.vibrate(15);
         if (itemPendienteSabor && itemPendienteSabor.maxSabores === 1) {
             setTimeout(confirmarSaborSeleccionado, 150);
+        } else if (itemPendienteSabor) {
+            const checks = document.querySelectorAll('#selector-sabor-pedido input[type="checkbox"]');
+            const checkedCount = Array.from(checks).filter(c => c.checked).length;
+            const max = itemPendienteSabor.maxSabores;
+            
+            checks.forEach(c => {
+                if (!c.checked) {
+                    c.disabled = (checkedCount >= max);
+                    c.parentElement.style.opacity = c.disabled ? '0.4' : '1';
+                    c.parentElement.style.pointerEvents = c.disabled ? 'none' : 'auto';
+                }
+            });
         }
     };
 
@@ -266,12 +278,18 @@ function abrirModalSabor(item) {
             </label>
         `).join('');
     } else {
-        selector.innerHTML = item.sabores.map((s, index) => `
-            <label class="sabor-opcion">
-                <input class="form-check-input" type="checkbox" value="${s}" ${index < item.maxSabores ? 'checked' : ''} onchange="toggleSaborFeedback(this)">
+        selector.innerHTML = item.sabores.map((s, index) => {
+            const isChecked = index < item.maxSabores;
+            const isDisabled = !isChecked; // Porque inicialmente seleccionamos el maximo permitido
+            const pointerStyle = isDisabled ? 'pointer-events: none;' : '';
+            const opacityStyle = isDisabled ? 'opacity: 0.4;' : '';
+            return `
+            <label class="sabor-opcion" style="${pointerStyle} ${opacityStyle}">
+                <input class="form-check-input" type="checkbox" value="${s}" ${isChecked ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} onchange="toggleSaborFeedback(this)">
                 <span>${s}</span>
             </label>
-        `).join('');
+            `;
+        }).join('');
     }
 
     new bootstrap.Modal(document.getElementById('modal-sabor')).show();
