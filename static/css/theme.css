@@ -444,24 +444,41 @@ h4 i {
 
 .sabor-selector-lista {
     display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    flex-wrap: wrap;
+    gap: 0.6rem;
 }
 
 .sabor-opcion {
+    flex: 1 1 calc(50% - 0.6rem); /* Dos columnas en grid */
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    border: 1px solid var(--borde);
+    justify-content: center;
+    text-align: center;
+    border: 2px solid var(--borde);
     border-radius: 12px;
-    padding: 0.65rem 0.75rem;
+    padding: 1.1rem 0.5rem;
     background: #fff;
     transition: var(--transicion);
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--texto-sec);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    margin: 0;
 }
 
-.sabor-opcion:hover {
-    border-color: var(--rosa);
-    background: var(--rosa-light);
+.sabor-opcion input {
+    display: none;
+}
+
+.sabor-opcion:has(input:checked) {
+    border-color: var(--menta);
+    background: var(--menta-light);
+    color: var(--menta-dark);
+}
+
+.sabor-opcion:active {
+    transform: scale(0.96);
 }
 
 .producto-admin-mobile {
@@ -726,6 +743,32 @@ hr { border-color: var(--borde); opacity: 1; }
 
     .modal-content {
         border-radius: 12px !important;
+    }
+
+    /* Modal Sabor como Bottom Sheet en celulares */
+    #modal-sabor .modal-dialog {
+        position: absolute;
+        bottom: 0;
+        margin: 0;
+        width: 100%;
+        max-width: 100%;
+        transition: transform 0.3s ease-out;
+    }
+
+    #modal-sabor .modal-content {
+        border-radius: 20px 20px 0 0 !important;
+        border: none;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    #modal-sabor .modal-footer {
+        flex-wrap: nowrap;
+    }
+    
+    #modal-sabor .modal-footer button {
+        flex: 1;
+        padding: 0.85rem;
+        font-size: 0.95rem;
     }
 
     /* ── Lista de grupos ── */
