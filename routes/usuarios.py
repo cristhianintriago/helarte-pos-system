@@ -35,7 +35,7 @@ def admin_o_superior(f):
 
 @usuarios_bp.route('/', methods=['GET'])
 @login_required
-@solo_root
+@admin_o_superior
 def listar():
     from flask import render_template
     return render_template('usuarios.html')
@@ -43,7 +43,7 @@ def listar():
 
 @usuarios_bp.route('/api', methods=['GET'])
 @login_required
-@solo_root
+@admin_o_superior
 def api_listar():
     usuarios = Usuario.query.all()
     return jsonify([{
@@ -89,13 +89,16 @@ def crear():
 
 @usuarios_bp.route('/api/<int:usuario_id>', methods=['PUT'])
 @login_required
-@solo_root
+@admin_o_superior
 def editar(usuario_id):
     usuario = Usuario.query.get_or_404(usuario_id)
     datos = request.json
 
     if usuario.rol == 'root':
         return jsonify({'error': 'No se puede modificar al usuario root'}), 403
+
+    if current_user.rol == 'admin' and usuario.rol != 'empleado':
+        return jsonify({'error': 'Solo puedes modificar usuarios con rol empleado'}), 403
 
     usuario.username = datos.get('username', usuario.username)
     usuario.rol = datos.get('rol', usuario.rol)
@@ -109,12 +112,15 @@ def editar(usuario_id):
 
 @usuarios_bp.route('/api/<int:usuario_id>', methods=['DELETE'])
 @login_required
-@solo_root
+@admin_o_superior
 def eliminar(usuario_id):
     usuario = Usuario.query.get_or_404(usuario_id)
 
     if usuario.rol == 'root':
         return jsonify({'error': 'No se puede eliminar al usuario root'}), 403
+
+    if current_user.rol == 'admin' and usuario.rol != 'empleado':
+        return jsonify({'error': 'Solo puedes eliminar usuarios con rol empleado'}), 403
 
     if usuario.id == current_user.id:
         return jsonify({'error': 'No puedes eliminarte a ti mismo'}), 400

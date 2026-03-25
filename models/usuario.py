@@ -38,8 +38,8 @@ class Usuario(db.Model, UserMixin):
         return self.rol in ['root', 'admin']
 
     def puede_gestionar_usuarios(self):
-        """Solo root puede ver y gestionar todos los usuarios del sistema."""
-        return self.rol == 'root'
+        """Root y admin pueden ver y gestionar usuarios del sistema."""
+        return self.rol in ['root', 'admin']
 
     def puede_crear_usuarios(self):
         """Root puede crear cualquier rol. Admin solo puede crear empleados."""

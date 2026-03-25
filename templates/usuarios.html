@@ -66,7 +66,9 @@ contenido %}
           <label class="form-label">Rol *</label>
           <select id="usuario-rol" class="form-select">
             <option value="empleado">Empleado</option>
+            {% if current_user.es_root() %}
             <option value="admin">Admin</option>
+            {% endif %}
           </select>
         </div>
       </div>
