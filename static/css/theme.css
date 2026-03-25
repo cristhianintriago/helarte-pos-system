@@ -759,6 +759,11 @@ hr { border-color: var(--borde); opacity: 1; }
         border-radius: 20px 20px 0 0 !important;
         border: none;
         padding-bottom: env(safe-area-inset-bottom);
+        max-height: 85vh;
+    }
+
+    #modal-sabor .modal-body {
+        overflow-y: auto;
     }
     
     #modal-sabor .modal-footer {
