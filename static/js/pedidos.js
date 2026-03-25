@@ -588,6 +588,17 @@ async function confirmarPedido() {
         }))
     };
 
+    if (!navigator.onLine) {
+        guardarPedidoOffline(datos);
+        mostrarToast('Sin conexión: Pedido guardado localmente (se enviará al reconectar).', 'warning');
+        bootstrap.Modal.getInstance(document.getElementById('modal-checkout'))?.hide();
+        limpiarPedido();
+        siguienteNumeroPedido++;
+        actualizarEtiquetaNumeroPedido();
+        setConfirmandoPedido(false);
+        return;
+    }
+
     try {
         const respuesta = await fetch('/pedidos/', {
             method: 'POST',
@@ -607,11 +618,58 @@ async function confirmarPedido() {
         }
     } catch (error) {
         console.error(error);
-        mostrarToast('Error de conexion al guardar el pedido', 'danger');
+        // Si el fetch falla por timeout o servidor caído, encolamos el pedido
+        guardarPedidoOffline(datos);
+        mostrarToast('Error en el servidor. Pedido guardado local de forma segura.', 'danger');
+        bootstrap.Modal.getInstance(document.getElementById('modal-checkout'))?.hide();
+        limpiarPedido();
+        siguienteNumeroPedido++;
+        actualizarEtiquetaNumeroPedido();
     } finally {
         setConfirmandoPedido(false);
     }
 }
+
+// --- LOGICA OFFLINE (PWA QUEUE) ---
+function guardarPedidoOffline(pedidoData) {
+    let cola = JSON.parse(localStorage.getItem('cola_pedidos') || '[]');
+    pedidoData._offline_id = Date.now().toString() + Math.random().toString(36).substring(2, 7);
+    cola.push(pedidoData);
+    localStorage.setItem('cola_pedidos', JSON.stringify(cola));
+}
+
+function sincronizarPedidosOffline() {
+    if (!navigator.onLine) return;
+    let cola = JSON.parse(localStorage.getItem('cola_pedidos') || '[]');
+    if (cola.length === 0) return;
+
+    const pedido = cola[0];
+    const offlineId = pedido._offline_id;
+    delete pedido._offline_id;
+
+    fetch('/pedidos/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pedido)
+    }).then(response => {
+        if (response.ok) {
+            cola.shift(); // Quitar de la cola
+            localStorage.setItem('cola_pedidos', JSON.stringify(cola));
+            mostrarToast('Pedido Offline enviado exitosamente.', 'success');
+            setTimeout(sincronizarPedidosOffline, 1000);
+            cargarPedidosActivos();
+            cargarSiguienteNumeroPedido();
+        } else {
+            pedido._offline_id = offlineId; // Restaurar si hubo un error HTTP (ej: 400 Bad Request)
+        }
+    }).catch(err => {
+        pedido._offline_id = offlineId; // Restaurar si fallo la red durante fetch
+    });
+}
+window.addEventListener('online', sincronizarPedidosOffline);
+setInterval(sincronizarPedidosOffline, 15000);
+document.addEventListener('DOMContentLoaded', sincronizarPedidosOffline);
+
 
 async function cargarPedidosActivos() {
     try {

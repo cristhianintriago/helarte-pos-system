@@ -306,6 +306,28 @@ def crear_pedido():
         if abs((m_efect + m_transf) - total) > 0.01:
             return jsonify({'error': f'Los montos (Efectivo: ${m_efect:.2f}, Transferencia: ${m_transf:.2f}) no suman el total del pedido (${total:.2f})'}), 400
 
+    # ── NUEVO FLUJO: Registrar Venta y actualizar Caja INMEDIATAMENTE al crear el pedido ──
+    venta = Venta(
+        pedido_id=nuevo_pedido.id,
+        total=total,
+        forma_pago=forma_pago,
+        numero_comprobante=nuevo_pedido.numero_comprobante,
+        monto_efectivo=nuevo_pedido.monto_efectivo,
+        monto_transferencia=nuevo_pedido.monto_transferencia
+    )
+    db.session.add(venta)
+
+    caja_abierta = Caja.query.filter_by(estado='abierta').first()
+    if caja_abierta:
+        caja_abierta.total_ingresos += total
+        if forma_pago == 'efectivo':
+            caja_abierta.total_efectivo += total
+        elif forma_pago in ['transferencia', 'pago_pedidosya', 'tarjeta']:
+            caja_abierta.total_transferencia += total
+        elif forma_pago == 'mixto':
+            caja_abierta.total_efectivo += (nuevo_pedido.monto_efectivo or 0.0)
+            caja_abierta.total_transferencia += (nuevo_pedido.monto_transferencia or 0.0)
+
     _avanzar_contador_tickets()
 
     db.session.commit()
@@ -364,30 +386,9 @@ def cambiar_estado(pedido_id):
 
     pedido.estado = nuevo_estado
 
-    # Si el pedido fue entregado, registramos la venta y actualizamos caja abierta.
-    if nuevo_estado == 'entregado':
-        venta = Venta(
-            pedido_id=pedido.id,
-            total=pedido.total,
-            forma_pago=pedido.forma_pago,
-            numero_comprobante=pedido.numero_comprobante,
-            monto_efectivo=pedido.monto_efectivo,
-            monto_transferencia=pedido.monto_transferencia
-        )
-        db.session.add(venta)
-
-        # Buscamos la caja abierta del día y sumamos el ingreso
-        caja_abierta = Caja.query.filter_by(estado='abierta').first()
-        if caja_abierta:
-            caja_abierta.total_ingresos += pedido.total
-            # ── NUEVO: suma al desglose por forma de pago
-            if pedido.forma_pago == 'efectivo':
-                caja_abierta.total_efectivo += pedido.total
-            elif pedido.forma_pago in ['transferencia', 'pago_pedidosya', 'tarjeta']:
-                caja_abierta.total_transferencia += pedido.total
-            elif pedido.forma_pago == 'mixto':
-                caja_abierta.total_efectivo += (pedido.monto_efectivo or 0.0)
-                caja_abierta.total_transferencia += (pedido.monto_transferencia or 0.0)
+    # Ya NO registramos la venta aquí, pues se registra en 'crear_pedido'.
+    # Solo actualizamos el estado del pedido, logrando que la cocina
+    # solo se encargue del flujo operativo y no del financiero.
 
     db.session.commit()
     return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado}'})
@@ -403,11 +404,22 @@ def eliminar_pedido(pedido_id):
     if pedido.estado == 'entregado':
         return jsonify({'error': 'No se puede eliminar un pedido ya entregado'}), 400
 
-    venta_asociada = Venta.query.filter_by(pedido_id=pedido.id).first()
-    if venta_asociada:
-        return jsonify({'error': 'No se puede eliminar un pedido con venta registrada'}), 400
-
+    # Reversar venta y flujos de caja asociados si se elimina un pedido en curso
     try:
+        venta_asociada = Venta.query.filter_by(pedido_id=pedido.id).first()
+        if venta_asociada:
+            caja_abierta = Caja.query.filter_by(estado='abierta').first()
+            if caja_abierta:
+                caja_abierta.total_ingresos -= venta_asociada.total
+                if venta_asociada.forma_pago == 'efectivo':
+                    caja_abierta.total_efectivo -= venta_asociada.total
+                elif venta_asociada.forma_pago in ['transferencia', 'pago_pedidosya', 'tarjeta']:
+                    caja_abierta.total_transferencia -= venta_asociada.total
+                elif venta_asociada.forma_pago == 'mixto':
+                    caja_abierta.total_efectivo -= (venta_asociada.monto_efectivo or 0.0)
+                    caja_abierta.total_transferencia -= (venta_asociada.monto_transferencia or 0.0)
+            db.session.delete(venta_asociada)
+
         DetallePedido.query.filter_by(pedido_id=pedido.id).delete()
         db.session.delete(pedido)
         db.session.commit()

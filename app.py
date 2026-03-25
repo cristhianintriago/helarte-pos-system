@@ -25,6 +25,7 @@ from routes.auth import auth_bp
 from routes.reporte_diario import reporte_diario_bp
 from routes.usuarios import usuarios_bp
 from routes.admin import admin_bp
+from routes.cocina import cocina_bp
 
 import hashlib
 from datetime import date
@@ -98,6 +99,7 @@ app.register_blueprint(productos_bp)
 app.register_blueprint(pedidos_bp)
 app.register_blueprint(caja_bp)
 app.register_blueprint(ventas_bp)
+app.register_blueprint(cocina_bp)
 app.register_blueprint(reportes_bp)
 app.register_blueprint(reporte_diario_bp)
 app.register_blueprint(usuarios_bp)
