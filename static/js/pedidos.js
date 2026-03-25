@@ -251,17 +251,24 @@ function abrirModalSabor(item) {
     label.textContent = `Selecciona sabor para ${item.nombre}`;
     regla.textContent = `Puedes elegir hasta ${item.maxSabores} sabor(es).`;
 
+    window.toggleSaborFeedback = function(input) {
+        if (navigator.vibrate) navigator.vibrate(15);
+        if (itemPendienteSabor && itemPendienteSabor.maxSabores === 1) {
+            setTimeout(confirmarSaborSeleccionado, 150);
+        }
+    };
+
     if (item.maxSabores === 1) {
-        selector.innerHTML = item.sabores.map((s, index) => `
+        selector.innerHTML = item.sabores.map((s) => `
             <label class="sabor-opcion">
-                <input class="form-check-input" name="sabor-unico" type="radio" value="${s}" ${index === 0 ? 'checked' : ''}>
+                <input class="form-check-input" name="sabor-unico" type="radio" value="${s}" onchange="toggleSaborFeedback(this)">
                 <span>${s}</span>
             </label>
         `).join('');
     } else {
         selector.innerHTML = item.sabores.map((s, index) => `
             <label class="sabor-opcion">
-                <input class="form-check-input" type="checkbox" value="${s}" ${index < item.maxSabores ? 'checked' : ''}>
+                <input class="form-check-input" type="checkbox" value="${s}" ${index < item.maxSabores ? 'checked' : ''} onchange="toggleSaborFeedback(this)">
                 <span>${s}</span>
             </label>
         `).join('');
