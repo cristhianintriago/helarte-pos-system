@@ -411,6 +411,13 @@ h4 i {
     transition: var(--transicion);
     border: 2px solid var(--borde) !important;
     background: var(--blanco) !important;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.producto-card:active {
+    transform: scale(0.96);
+    transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .producto-card:hover {
