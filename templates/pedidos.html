@@ -67,8 +67,8 @@
 
 <div class="mobile-action-bar d-md-none">
   <div class="mobile-action-content">
-    <div class="mobile-total-box">
-      <small class="text-muted d-block">Total pedido</small>
+    <div class="mobile-total-box" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-carrito" aria-controls="offcanvas-carrito" style="cursor: pointer;">
+      <small class="text-muted d-block">Total pedido <i class="bi bi-chevron-up"></i></small>
       <strong id="total-pedido-mobile" class="text-success">$0.00</strong>
       <small id="items-pedido-mobile" class="text-muted d-block">0 items</small>
     </div>
@@ -102,6 +102,18 @@
         <i class="bi bi-inbox fs-3"></i>
         <p class="mt-2 mb-0">Cargando pedidos...</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="offcanvas offcanvas-bottom d-md-none" tabindex="-1" id="offcanvas-carrito" aria-labelledby="offcanvas-carrito-label" style="height: 60vh; z-index: 1050;">
+  <div class="offcanvas-header border-bottom">
+    <h5 class="offcanvas-title" id="offcanvas-carrito-label"><i class="bi bi-cart"></i> Tu Pedido</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <div id="items-pedido-mobile-list" class="list-group list-group-flush mb-3">
+      <p class="text-muted small text-center my-4" id="pedido-vacio-mobile">No hay productos aun</p>
     </div>
   </div>
 </div>

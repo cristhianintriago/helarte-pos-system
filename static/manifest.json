@@ -1,0 +1,16 @@
+{
+  "name": "Helarte POS",
+  "short_name": "Helarte",
+  "start_url": "/pedidos",
+  "display": "standalone",
+  "background_color": "#FFF9FC",
+  "theme_color": "#FF7EB8",
+  "description": "Sistema de Punto de Venta Helarte",
+  "icons": [
+    {
+      "src": "/static/img/logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png"
+    }
+  ]
+}

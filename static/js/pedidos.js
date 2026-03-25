@@ -300,16 +300,18 @@ function confirmarSaborSeleccionado() {
 
 function actualizarResumen() {
     const contenedor = document.getElementById('items-pedido');
-    if (!contenedor) return;
-
-    contenedor.innerHTML = '';
+    const contenedorMobile = document.getElementById('items-pedido-mobile-list');
+    
+    if (contenedor) contenedor.innerHTML = '';
+    if (contenedorMobile) contenedorMobile.innerHTML = '';
 
     if (pedidoActual.productos.length === 0) {
-        const vacio = document.createElement('p');
-        vacio.className = 'text-muted small';
-        vacio.id = 'pedido-vacio';
-        vacio.textContent = 'No hay productos aun';
-        contenedor.appendChild(vacio);
+        if (contenedor) {
+            contenedor.innerHTML = '<p class="text-muted small" id="pedido-vacio">No hay productos aun</p>';
+        }
+        if (contenedorMobile) {
+            contenedorMobile.innerHTML = '<p class="text-muted small text-center my-4" id="pedido-vacio-mobile">No hay productos aun</p>';
+        }
         document.getElementById('total-pedido').textContent = '$0.00';
         actualizarResumenMovil(0, 0);
         actualizarCheckoutTotal(0);
@@ -325,9 +327,7 @@ function actualizarResumen() {
         items += item.cantidad;
 
         const saborSeguro = item.sabor ? item.sabor.replace(/'/g, "\\'") : null;
-        const div = document.createElement('div');
-        div.className = 'list-group-item d-flex justify-content-between align-items-center px-0 py-2';
-        div.innerHTML = `
+        const html = `
             <div>
                 <span class="fw-bold small">${item.nombre}</span>
                 ${item.sabor ? `<span class="badge bg-light text-dark border ms-1">${item.sabor}</span>` : ''}
@@ -340,7 +340,19 @@ function actualizarResumen() {
                     <i class="bi bi-dash"></i>
                 </button>
             </div>`;
-        contenedor.appendChild(div);
+
+        if (contenedor) {
+            const div = document.createElement('div');
+            div.className = 'list-group-item d-flex justify-content-between align-items-center px-0 py-2';
+            div.innerHTML = html;
+            contenedor.appendChild(div);
+        }
+        if (contenedorMobile) {
+            const divM = document.createElement('div');
+            divM.className = 'list-group-item d-flex justify-content-between align-items-center px-0 py-2';
+            divM.innerHTML = html;
+            contenedorMobile.appendChild(divM);
+        }
     });
 
     document.getElementById('total-pedido').textContent = `$${total.toFixed(2)}`;
@@ -365,6 +377,7 @@ function actualizarResumenMovil(total, items) {
 }
 
 function quitarProducto(id, sabor = null) {
+    if (navigator.vibrate) navigator.vibrate(15);
     const item = pedidoActual.productos.find(
         (p) => p.producto_id === id && (p.sabor || null) === (sabor || null)
     );
@@ -383,6 +396,7 @@ function quitarProducto(id, sabor = null) {
 }
 
 function abrirCheckout() {
+    if (navigator.vibrate) navigator.vibrate(20);
     if (pedidoActual.productos.length === 0) {
         mostrarToast('Agrega al menos un producto', 'warning');
         return;
@@ -395,6 +409,7 @@ function abrirCheckout() {
 }
 
 function setTipo(tipo) {
+    if (navigator.vibrate) navigator.vibrate(10);
     pedidoActual.tipo = tipo;
     const camposDelivery = document.getElementById('campos-delivery');
     if (camposDelivery) camposDelivery.style.display = tipo === 'delivery' ? 'block' : 'none';
@@ -422,6 +437,7 @@ function setTipo(tipo) {
 
 // Controla visibilidad de campos extra segun forma de pago elegida.
 function setFormaPago(forma) {
+    if (navigator.vibrate) navigator.vibrate(10);
     formaPagoActual = forma;
     ['efectivo', 'transferencia', 'mixto', 'pago_pedidosya'].forEach((f) => {
         const btn = document.getElementById(`btn-${f}`);
