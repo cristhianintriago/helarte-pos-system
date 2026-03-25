@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block title %}Cocina - Comanda Digital{% endblock %}
+
+{% block contenido %}
+<div class="main-content" style="padding-top: 1rem; padding-bottom: 2rem;">
+    <!-- Ocultamos elementos innecesarios en la navbar nativa si estamos en la vista cocina -->
+    <style>
+        @media (min-width: 992px) {
+            body { background-color: var(--gris-claro); }
+        }
+    </style>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0 fw-bold text-dark"><i class="bi bi-display"></i> Comandas | Cocina</h2>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success fs-6" id="estado-conexion">En Línea</span>
+            <span class="badge bg-dark fs-5 py-2 px-3 ms-2 shadow-sm rounded-3" id="reloj-cocina">00:00</span>
+        </div>
+    </div>
+
+    <!-- Grid apaisado para tablets -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4" id="lista-comandas">
+        <div class="col-12 text-center text-muted py-5">
+            <div class="spinner-border text-helarte-menta" role="status"></div>
+            <p class="mt-2">Sincronizando comandas...</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/cocina.js') }}?v=1"></script>
+{% endblock %}
