@@ -177,16 +177,16 @@
           </div>
 
           <div id="campos-pago-extra" class="mt-2 p-2 bg-light rounded border" style="display: none;">
-            <div id="campos-efectivo" class="row g-1 mb-2" style="display: none;">
-              <div class="col-6">
+            <div id="campos-efectivo" class="row g-2 mb-2" style="display: none;">
+              <div class="col-12">
                 <label class="form-label fw-bold small text-muted mb-1">Monto Recibido</label>
                 <div class="input-group input-group-sm">
                   <span class="input-group-text">$</span>
                   <input type="number" id="monto-recibido" oninput="calcularCambioEfectivo()" class="form-control" step="0.01" min="0" placeholder="0.00">
                 </div>
               </div>
-              <div class="col-6">
-                <label class="form-label fw-bold small text-muted mb-1">Cambio</label>
+              <div class="col-12">
+                <label class="form-label fw-bold small text-muted mb-1">Cambio a Devolver</label>
                 <div class="input-group input-group-sm">
                   <span class="input-group-text">$</span>
                   <input type="text" id="monto-cambio" class="form-control text-success fw-bold" readonly placeholder="0.00">
