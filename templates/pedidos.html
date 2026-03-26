@@ -164,7 +164,7 @@
         </div>
 
         <div class="mb-2">
-          <input type="text" id="cliente-nombre" class="form-control form-control-sm mb-1"
+          <input type="text" id="cliente-nombre" class="form-control mb-1"
                   placeholder="Nombre del cliente" value="Consumidor final" />
         </div>
 
@@ -180,14 +180,14 @@
             <div id="campos-efectivo" class="row g-2 mb-2" style="display: none;">
               <div class="col-12">
                 <label class="form-label fw-bold small text-muted mb-1">Monto Recibido</label>
-                <div class="input-group input-group-sm">
+                <div class="input-group">
                   <span class="input-group-text">$</span>
                   <input type="number" id="monto-recibido" oninput="calcularCambioEfectivo()" class="form-control" step="0.01" min="0" placeholder="0.00">
                 </div>
               </div>
               <div class="col-12">
                 <label class="form-label fw-bold small text-muted mb-1">Cambio a Devolver</label>
-                <div class="input-group input-group-sm">
+                <div class="input-group">
                   <span class="input-group-text">$</span>
                   <input type="text" id="monto-cambio" class="form-control text-success fw-bold" readonly placeholder="0.00">
                 </div>
@@ -196,19 +196,19 @@
 
             <div id="campo-comprobante" class="mb-2" style="display: none;">
               <label class="form-label fw-bold small text-muted mb-1">N Comprobante *</label>
-              <input type="text" id="numero-comprobante" class="form-control form-control-sm" placeholder="Ej: 12345678">
+              <input type="text" id="numero-comprobante" class="form-control" placeholder="Ej: 12345678">
             </div>
             <div id="campos-mixto" class="row g-1" style="display: none;">
               <div class="col-6">
                 <label class="form-label fw-bold small text-muted mb-1">Efectivo *</label>
-                <div class="input-group input-group-sm">
+                <div class="input-group">
                   <span class="input-group-text">$</span>
                   <input type="number" id="monto-efectivo" class="form-control" step="0.01" min="0" placeholder="0.00">
                 </div>
               </div>
               <div class="col-6">
                 <label class="form-label fw-bold small text-muted mb-1">Transferencia *</label>
-                <div class="input-group input-group-sm">
+                <div class="input-group">
                   <span class="input-group-text">$</span>
                   <input type="number" id="monto-transferencia" class="form-control" step="0.01" min="0" placeholder="0.00">
                 </div>
