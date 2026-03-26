@@ -712,9 +712,14 @@ function renderizarPedidosActivos(pedidos) {
             ? '<span class="badge bg-warning text-dark">Delivery</span>'
             : '<span class="badge bg-info text-dark">Local</span>';
 
-        const badgeEstado = p.estado === 'pendiente'
-            ? '<span class="badge bg-secondary">Pendiente</span>'
-            : '<span class="badge bg-primary">En Proceso</span>';
+        let badgeEstado = '';
+        if (p.estado === 'pendiente') {
+            badgeEstado = '<span class="badge bg-secondary">Pendiente</span>';
+        } else if (p.estado === 'en_proceso') {
+            badgeEstado = '<span class="badge bg-primary">En Cocina</span>';
+        } else if (p.estado === 'preparado') {
+            badgeEstado = '<span class="badge bg-success">Listo p/ Entregar</span>';
+        }
 
         const badgePago = p.forma_pago === 'transferencia'
             ? `<span class="badge bg-light text-dark border">Transf. #${p.numero_comprobante || '—'}</span>`
@@ -751,9 +756,14 @@ function renderizarPedidosActivos(pedidos) {
                         <button class="btn btn-sm btn-outline-danger" onclick="eliminarPedido(${p.id})">
                             <i class="bi bi-trash"></i> Eliminar
                         </button>
-                        <button class="btn btn-sm btn-success" onclick="cambiarEstado(${p.id}, 'entregado')">
-                            <i class="bi bi-check-lg"></i> Entregado
-                        </button>
+                        ${p.estado === 'preparado' 
+                            ? `<button class="btn btn-sm btn-success" onclick="cambiarEstado(${p.id}, 'entregado')">
+                                 <i class="bi bi-check-lg"></i> Entregar al Cliente
+                               </button>`
+                            : `<button class="btn btn-sm btn-secondary" disabled>
+                                 <i class="bi bi-hourglass"></i> Esperando Cocina
+                               </button>`
+                        }
                     </div>
                 </div>
             </div>`;

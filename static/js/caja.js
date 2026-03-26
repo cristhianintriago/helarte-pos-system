@@ -32,6 +32,8 @@ function mostrarCajaAbierta(datos) {
     // ── NUEVO: desglose por forma de pago
     document.getElementById('resumen-efectivo').textContent      = `$${(datos.total_efectivo || 0).toFixed(2)}`;
     document.getElementById('resumen-transferencia').textContent = `$${(datos.total_transferencia || 0).toFixed(2)}`;
+    const cajonEl = document.getElementById('resumen-efectivo-caja');
+    if (cajonEl) cajonEl.textContent = `$${(datos.efectivo_en_caja || 0).toFixed(2)}`;
 }
 
 
@@ -151,9 +153,13 @@ async function cerrarCaja() {
                     <span>Total egresos</span>
                     <strong class="text-danger">-$${datos.total_egresos.toFixed(2)}</strong>
                 </li>
-                <li class="list-group-item d-flex justify-content-between fs-5 bg-light">
-                    <span><strong>Monto final en caja</strong></span>
-                    <strong class="text-primary">$${datos.monto_final.toFixed(2)}</strong>
+                <li class="list-group-item d-flex justify-content-between fs-6 bg-light text-muted">
+                    <span>Balance Contable General</span>
+                    <strong>$${datos.monto_final.toFixed(2)}</strong>
+                </li>
+                <li class="list-group-item d-flex justify-content-between fs-4 shadow-sm" style="background-color: #d1e7dd; border-top: 3px dashed #198754;">
+                    <span class="text-success fw-bold">Efectivo a rendir</span>
+                    <strong class="text-success">$${(datos.efectivo_en_caja || 0).toFixed(2)}</strong>
                 </li>
             </ul>`;
         new bootstrap.Modal(document.getElementById('modal-cuadre')).show();

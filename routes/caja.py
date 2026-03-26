@@ -77,7 +77,8 @@ def cerrar_caja():
         'total_efectivo': caja.total_efectivo,
         'total_transferencia': caja.total_transferencia,
         'total_egresos': caja.total_egresos,
-        'monto_final': caja.monto_final
+        'monto_final': caja.monto_final,
+        'efectivo_en_caja': caja.monto_inicial + (caja.total_efectivo or 0) - caja.total_egresos
     })
 
 
@@ -145,6 +146,7 @@ def estado_caja():
         'total_transferencia': caja.total_transferencia,
         'total_egresos': caja.total_egresos,
         'balance_actual': caja.monto_inicial + caja.total_ingresos - caja.total_egresos,
+        'efectivo_en_caja': caja.monto_inicial + (caja.total_efectivo or 0) - caja.total_egresos,
         'is_admin': current_user.puede_reabrir_caja()  # Flag para mostrar botón de reinicio en el frontend
     })
 

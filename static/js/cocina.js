@@ -43,7 +43,10 @@ function renderizarComandas(pedidos) {
     const contenedor = document.getElementById('lista-comandas');
     if (!contenedor) return;
 
-    if (pedidos.length === 0) {
+    // La cocina solo debe ver los pedidos que les falta preparar
+    const pedidosCocina = pedidos.filter(p => ['pendiente', 'en_proceso'].includes(p.estado));
+
+    if (pedidosCocina.length === 0) {
         const htmlVacio = `
             <div class="col-12 text-center text-muted" style="margin-top: 15vh;">
                 <i class="bi bi-check-circle" style="font-size: 5rem; color: var(--borde);"></i>
@@ -58,13 +61,13 @@ function renderizarComandas(pedidos) {
         return;
     }
 
-    pedidos.sort((a,b) => {
+    pedidosCocina.sort((a,b) => {
         if (a.estado === b.estado) return a.id - b.id;
         if (a.estado === 'en_proceso') return -1;
         return 1;
     });
 
-    const html = pedidos.map(p => {
+    const html = pedidosCocina.map(p => {
         const detalles = p.detalles.map(d => `
             <li class="list-group-item px-2 py-1 d-flex justify-content-between border-0 bg-transparent">
                 <span class="fw-bold fs-5 text-dark">${d.cantidad}x ${d.producto}</span>
@@ -74,10 +77,10 @@ function renderizarComandas(pedidos) {
 
         const isPendiente = p.estado === 'pendiente';
         const colorHeader = isPendiente ? 'bg-dark text-white' : 'bg-primary text-white';
-        const txtBoton = isPendiente ? 'Empezar a Preparar' : 'Marcar Listo (Entregar)';
+        const txtBoton = isPendiente ? 'Empezar a Preparar' : 'Marcar Listo';
         const iconoBoton = isPendiente ? 'bi-hand-index-thumb' : 'bi-check-all';
         const colorBoton = isPendiente ? 'btn-outline-primary' : 'btn-success';
-        const nuevoEstado = isPendiente ? 'en_proceso' : 'entregado';
+        const nuevoEstado = isPendiente ? 'en_proceso' : 'preparado';
 
         return `
             <div class="col">
@@ -109,8 +112,8 @@ function renderizarComandas(pedidos) {
 }
 
 async function cambiarEstadoKDS(pedidoId, nuevoEstado) {
-    if (nuevoEstado === 'entregado') {
-        const confirmar = confirm('¿Confirmas que este pedido ya salió de la cocina?');
+    if (nuevoEstado === 'preparado') {
+        const confirmar = confirm('¿Confirmas que este pedido ya está preparado?');
         if (!confirmar) return;
     }
     

@@ -691,7 +691,34 @@ hr { border-color: var(--borde); opacity: 1; }
     }
 
     .main-content {
+        padding: 1rem 0.5rem;
         padding-bottom: 5.6rem;
+    }
+
+    #filtros {
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch;
+    }
+    #filtros::-webkit-scrollbar {
+        height: 3px;
+        background: transparent;
+    }
+    #filtros::-webkit-scrollbar-thumb {
+        background: var(--borde);
+        border-radius: 4px;
+    }
+    #filtros .btn {
+        flex: 0 0 auto;
+    }
+
+    .navbar-brand {
+        font-size: 1.05rem;
+    }
+    .navbar-brand img {
+        height: 38px;
+        width: 38px;
     }
 
     .mobile-action-bar {
@@ -807,11 +834,21 @@ hr { border-color: var(--borde); opacity: 1; }
         padding: 0.75rem 0.5rem;
     }
 
-    /* Una columna para productos */
+    /* Mantenemos 2 columnas en móviles muy pequeños para ahorrar espacio vertical */
     #lista-productos .col,
     #lista-productos [class*="col-"] {
-        flex: 0 0 100%;
-        max-width: 100%;
+        flex: 0 0 50%;
+        max-width: 50%;
+    }
+    .producto-card .card-body {
+        padding: 0.5rem !important;
+    }
+    .producto-card img {
+        width: 42px !important;
+        height: 42px !important;
+    }
+    .producto-card .small {
+        font-size: 0.75rem;
     }
 
     .btn {
