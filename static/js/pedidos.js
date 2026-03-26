@@ -347,7 +347,8 @@ function actualizarResumen() {
     let items = 0;
 
     pedidoActual.productos.forEach((item) => {
-        const subtotal = item.precio * item.cantidad;
+        const precioUnitario = pedidoActual.tipo === 'delivery' ? item.precio + 0.25 : item.precio;
+        const subtotal = precioUnitario * item.cantidad;
         total += subtotal;
         items += item.cantidad;
 
@@ -357,7 +358,7 @@ function actualizarResumen() {
                 <span class="fw-bold small">${item.nombre}</span>
                 ${item.sabor ? `<span class="badge bg-light text-dark border ms-1">${item.sabor}</span>` : ''}
                 <br>
-                <small class="text-muted">$${item.precio.toFixed(2)} x ${item.cantidad}</small>
+                <small class="text-muted">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${pedidoActual.tipo === 'delivery' ? '<span class="text-warning" style="font-size: 0.65rem;">(+0.25)</span>' : ''}</small>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <span class="text-success fw-bold small">$${subtotal.toFixed(2)}</span>
@@ -389,6 +390,9 @@ function actualizarCheckoutTotal(total) {
     const target = document.getElementById('checkout-total');
     if (target) {
         target.textContent = `$${Number(total).toFixed(2)}`;
+    }
+    if (typeof calcularCambioEfectivo === 'function') {
+        calcularCambioEfectivo();
     }
 }
 
@@ -428,7 +432,7 @@ function abrirCheckout() {
     }
 
     actualizarEtiquetaNumeroPedido();
-    const total = pedidoActual.productos.reduce((acc, p) => acc + (p.precio * p.cantidad), 0);
+    const total = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
     actualizarCheckoutTotal(total);
     new bootstrap.Modal(document.getElementById('modal-checkout')).show();
 }
@@ -436,23 +440,10 @@ function abrirCheckout() {
 function setTipo(tipo) {
     if (navigator.vibrate) navigator.vibrate(10);
     pedidoActual.tipo = tipo;
-    const camposDelivery = document.getElementById('campos-delivery');
-    if (camposDelivery) camposDelivery.style.display = tipo === 'delivery' ? 'block' : 'none';
 
-    const btnTransferencia = document.getElementById('btn-transferencia');
-    const btnMixto = document.getElementById('btn-mixto');
-    const btnPagoPedidosYa = document.getElementById('btn-pago-pedidosya');
-
-    if (btnTransferencia) btnTransferencia.style.display = tipo === 'delivery' ? 'none' : 'inline-block';
-    if (btnMixto) btnMixto.style.display = tipo === 'delivery' ? 'none' : 'inline-block';
-    if (btnPagoPedidosYa) btnPagoPedidosYa.style.display = tipo === 'delivery' ? 'inline-block' : 'none';
-
-    if (tipo === 'delivery' && !['efectivo', 'pago_pedidosya'].includes(formaPagoActual)) {
-        setFormaPago('efectivo');
-    }
-    if (tipo === 'local' && formaPagoActual === 'pago_pedidosya') {
-        setFormaPago('efectivo');
-    }
+    actualizarResumen();
+    const total = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+    actualizarCheckoutTotal(total);
 
     const btnLocal = document.getElementById('btn-local');
     const btnDelivery = document.getElementById('btn-delivery');
@@ -464,49 +455,73 @@ function setTipo(tipo) {
 function setFormaPago(forma) {
     if (navigator.vibrate) navigator.vibrate(10);
     formaPagoActual = forma;
-    ['efectivo', 'transferencia', 'mixto', 'pago_pedidosya'].forEach((f) => {
+    ['efectivo', 'transferencia', 'mixto'].forEach((f) => {
         const btn = document.getElementById(`btn-${f}`);
-        const btnAliasPedidosYa = document.getElementById('btn-pago-pedidosya');
-        if (f === 'pago_pedidosya' && btnAliasPedidosYa) {
-            btnAliasPedidosYa.className = `btn btn-sm flex-fill ${f === forma ? 'btn-dark' : 'btn-outline-dark'}`;
-            return;
-        }
         if (btn) btn.className = `btn btn-sm flex-fill ${f === forma ? 'btn-dark' : 'btn-outline-dark'}`;
     });
 
     const contenedorExtra = document.getElementById('campos-pago-extra');
     const compComprobante = document.getElementById('campo-comprobante');
     const compMixto = document.getElementById('campos-mixto');
+    const compEfectivo = document.getElementById('campos-efectivo');
 
     if (!contenedorExtra || !compComprobante || !compMixto) return;
 
+    contenedorExtra.style.display = 'block';
+
     if (forma === 'efectivo') {
-        contenedorExtra.style.display = 'none';
         compComprobante.style.display = 'none';
         compMixto.style.display = 'none';
+        if (compEfectivo) compEfectivo.style.display = 'flex';
+        calcularCambioEfectivo();
     } else if (forma === 'transferencia') {
-        contenedorExtra.style.display = 'block';
         compComprobante.style.display = 'block';
         compMixto.style.display = 'none';
-    } else if (forma === 'pago_pedidosya') {
-        contenedorExtra.style.display = 'none';
-        compComprobante.style.display = 'none';
-        compMixto.style.display = 'none';
+        if (compEfectivo) compEfectivo.style.display = 'none';
     } else {
-        contenedorExtra.style.display = 'block';
         compComprobante.style.display = 'block';
         compMixto.style.display = 'flex';
+        if (compEfectivo) compEfectivo.style.display = 'none';
+    }
+}
+
+// Calcula el cambio matematico en tiempo real p/ pagos en efectivo
+function calcularCambioEfectivo() {
+    if (formaPagoActual !== 'efectivo') return;
+    
+    const subtotalBruto = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+    const inputRecibido = document.getElementById('monto-recibido');
+    const recibido = parseFloat(inputRecibido?.value) || 0;
+    const cambioInput = document.getElementById('monto-cambio');
+    
+    if (!cambioInput) return;
+
+    if (recibido === 0 || inputRecibido.value === '') {
+        cambioInput.value = '';
+        cambioInput.classList.replace('text-danger', 'text-success');
+        return;
+    }
+
+    const cambio = recibido - subtotalBruto;
+    if (cambio >= 0) {
+        cambioInput.value = cambio.toFixed(2);
+        cambioInput.classList.replace('text-danger', 'text-success');
+    } else {
+        cambioInput.value = 'Faltan $' + Math.abs(cambio).toFixed(2);
+        cambioInput.classList.replace('text-success', 'text-danger');
     }
 }
 
 function limpiarPedido() {
     pedidoActual.productos = [];
     document.getElementById('cliente-nombre').value = 'Consumidor final';
-    const plataforma = document.getElementById('cliente-plataforma');
-    if (plataforma) plataforma.value = 'PedidosYa';
     document.getElementById('numero-comprobante').value = '';
     document.getElementById('monto-efectivo').value = '';
     document.getElementById('monto-transferencia').value = '';
+    const mr = document.getElementById('monto-recibido');
+    if (mr) mr.value = '';
+    const mc = document.getElementById('monto-cambio');
+    if (mc) mc.value = '';
     document.getElementById('validacion-montos').style.display = 'none';
 
     setTipo('local');
@@ -550,13 +565,22 @@ async function confirmarPedido() {
         return;
     }
 
+    if (formaPagoActual === 'efectivo') {
+        const recibido = parseFloat(document.getElementById('monto-recibido')?.value) || 0;
+        const totalReq = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+        if (recibido > 0 && recibido < totalReq) {
+            mostrarToast(`Faltan $${(totalReq - recibido).toFixed(2)} para completar el pago`, 'warning');
+            return;
+        }
+    }
+
     if (formaPagoActual === 'mixto') {
         if (!numComprobante) {
             mostrarToast('Debes ingresar el numero de comprobante', 'warning');
             return;
         }
 
-        const totalVal = pedidoActual.productos.reduce((acc, p) => acc + (p.precio * p.cantidad), 0);
+        const totalVal = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
         if (Math.abs((mEfectivo + mTransferencia) - totalVal) > 0.01) {
             document.getElementById('validacion-montos').style.display = 'block';
             mostrarToast('Los montos no suman el total del pedido', 'warning');
@@ -573,9 +597,7 @@ async function confirmarPedido() {
         cliente_nombre: nombre || 'Consumidor final',
         cliente_telefono: null,
         cliente_direccion: null,
-        plataforma: pedidoActual.tipo === 'delivery'
-            ? (document.getElementById('cliente-plataforma')?.value || 'PedidosYa')
-            : null,
+        plataforma: null,
         forma_pago: formaPagoActual,
         numero_comprobante: ['transferencia', 'mixto'].includes(formaPagoActual) ? numComprobante : null,
         monto_efectivo: formaPagoActual === 'mixto' ? mEfectivo : null,
