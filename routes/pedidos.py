@@ -281,7 +281,9 @@ def crear_pedido():
         elif sabores_seleccionados:
             return jsonify({'error': f'{producto.nombre} no tiene sabores configurados'}), 400
 
-        subtotal = producto.precio * item['cantidad']
+        # Cargo automático de $0.25 adicional por item si es delivery
+        precio_final = producto.precio + (0.25 if datos.get('tipo') == 'delivery' else 0.0)
+        subtotal = precio_final * item['cantidad']
         total += subtotal
 
         detalle = DetallePedido(

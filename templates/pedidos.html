@@ -166,10 +166,6 @@
         <div class="mb-2">
           <input type="text" id="cliente-nombre" class="form-control form-control-sm mb-1"
                   placeholder="Nombre del cliente" value="Consumidor final" />
-          <div id="campos-delivery" style="display: none">
-            <label class="form-label fw-bold small text-muted mb-1">Plataforma</label>
-            <input type="text" id="cliente-plataforma" class="form-control form-control-sm" value="PedidosYa" />
-          </div>
         </div>
 
         <div class="mb-2">
@@ -178,10 +174,26 @@
             <button id="btn-efectivo" class="btn btn-dark btn-sm flex-fill" onclick="setFormaPago('efectivo')">Efectivo</button>
             <button id="btn-transferencia" class="btn btn-outline-dark btn-sm flex-fill" onclick="setFormaPago('transferencia')">Transferencia</button>
             <button id="btn-mixto" class="btn btn-outline-dark btn-sm flex-fill" onclick="setFormaPago('mixto')">Mixto</button>
-            <button id="btn-pago-pedidosya" class="btn btn-outline-dark btn-sm flex-fill" onclick="setFormaPago('pago_pedidosya')">Pago PedidosYa</button>
           </div>
 
           <div id="campos-pago-extra" class="mt-2 p-2 bg-light rounded border" style="display: none;">
+            <div id="campos-efectivo" class="row g-1 mb-2" style="display: none;">
+              <div class="col-6">
+                <label class="form-label fw-bold small text-muted mb-1">Monto Recibido</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="number" id="monto-recibido" oninput="calcularCambioEfectivo()" class="form-control" step="0.01" min="0" placeholder="0.00">
+                </div>
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-bold small text-muted mb-1">Cambio</label>
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text">$</span>
+                  <input type="text" id="monto-cambio" class="form-control text-success fw-bold" readonly placeholder="0.00">
+                </div>
+              </div>
+            </div>
+
             <div id="campo-comprobante" class="mb-2" style="display: none;">
               <label class="form-label fw-bold small text-muted mb-1">N Comprobante *</label>
               <input type="text" id="numero-comprobante" class="form-control form-control-sm" placeholder="Ej: 12345678">
