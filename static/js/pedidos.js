@@ -134,27 +134,24 @@ function renderizarProductos(productos) {
 
     productos.forEach((p) => {
         const col = document.createElement('div');
-        col.className = 'col-6 col-md-4 col-xl-3';
+        col.className = 'col-6 col-md-4';
 
         const tieneSabores = (p.sabores || []).length > 0;
         const img = p.imagen_url
-            ? `<img src="${p.imagen_url}" alt="${p.nombre}" class="producto-img">`
-            : '<div class="producto-img-placeholder d-flex align-items-center justify-content-center"><i class="bi bi-image text-muted opacity-25" style="font-size: 2rem;"></i></div>';
+            ? `<img src="${p.imagen_url}" alt="${p.nombre}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;">`
+            : '<div class="fs-3">🍦</div>';
 
-        const badgeSabores = tieneSabores ? `<span class="badge-sabor-indicador"><i class="bi bi-stars"></i></span>` : '';
         const nombreSeguro = p.nombre.replace(/'/g, "\\'");
 
         col.innerHTML = `
-            <div class="card producto-card h-100 ${!p.disponible ? 'agotado' : ''}"
+            <div class="card producto-card ${!p.disponible ? 'agotado' : ''}"
                  onclick="${p.disponible ? `handleProductoTap(this, ${p.id}, '${nombreSeguro}', ${p.precio})` : ''}">
-                <div class="producto-img-container">
+                <div class="card-body text-center p-2">
                     ${img}
-                    <div class="producto-precio-badge">$${p.precio.toFixed(2)}</div>
-                    ${badgeSabores}
-                </div>
-                <div class="card-body p-2 d-flex flex-column justify-content-center text-center">
-                    <h6 class="fw-bold mb-0 lh-sm text-dark" style="font-size: 0.85rem;">${p.nombre}</h6>
-                    ${!p.disponible ? '<small class="text-danger fw-bold mt-1">Agotado</small>' : ''}
+                    <p class="fw-bold mb-1 small">${p.nombre}</p>
+                    ${tieneSabores ? '<small class="text-muted d-block">Con sabores</small>' : '<small class="text-muted d-block">Sabor fijo</small>'}
+                    <span class="badge bg-dark">$${p.precio.toFixed(2)}</span>
+                    ${!p.disponible ? '<br><small class="text-danger">Agotado</small>' : ''}
                 </div>
             </div>`;
         contenedor.appendChild(col);
