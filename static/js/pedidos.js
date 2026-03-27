@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         cargarSiguienteNumeroPedido()
     ]);
 
-    setInterval(cargarPedidosActivos, 20000);
+    setInterval(cargarPedidosActivos, 5000);
     setFormaPago('efectivo');
     setTipo('local');
 });
@@ -78,7 +78,7 @@ function renderizarFiltros(productos) {
 
     categorias.forEach((cat) => {
         const btn = document.createElement('button');
-        btn.className = 'btn btn-sm btn-outline-dark filtro-btn dinamico';
+        btn.className = 'btn btn-sm filtro-btn dinamico px-3 text-nowrap';
         btn.textContent = cat;
         btn.onclick = (event) => filtrarCategoria(cat, event);
         contenedor.appendChild(btn);
@@ -88,16 +88,12 @@ function renderizarFiltros(productos) {
 function filtrarCategoria(categoria, event) {
     categoriaActual = categoria;
     document.querySelectorAll('.filtro-btn').forEach((b) => {
-        b.classList.remove('activo', 'btn-dark');
-        if (!b.classList.contains('btn-outline-dark')) {
-            b.classList.add('btn-outline-dark');
-        }
+        b.classList.remove('activo');
     });
 
     const objetivo = event?.target || document.querySelector(`#filtros .filtro-btn`);
     if (objetivo) {
-        objetivo.classList.add('activo', 'btn-dark');
-        objetivo.classList.remove('btn-outline-dark');
+        objetivo.classList.add('activo');
     }
 
     aplicarFiltrosCatalogo();
@@ -138,24 +134,27 @@ function renderizarProductos(productos) {
 
     productos.forEach((p) => {
         const col = document.createElement('div');
-        col.className = 'col-6 col-md-4';
+        col.className = 'col-6 col-md-4 col-xl-3';
 
         const tieneSabores = (p.sabores || []).length > 0;
         const img = p.imagen_url
-            ? `<img src="${p.imagen_url}" alt="${p.nombre}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;">`
-            : '<div class="fs-3">🍦</div>';
+            ? `<img src="${p.imagen_url}" alt="${p.nombre}" class="producto-img">`
+            : '<div class="producto-img-placeholder d-flex align-items-center justify-content-center"><i class="bi bi-image text-muted opacity-25" style="font-size: 2rem;"></i></div>';
 
+        const badgeSabores = tieneSabores ? `<span class="badge-sabor-indicador"><i class="bi bi-stars"></i></span>` : '';
         const nombreSeguro = p.nombre.replace(/'/g, "\\'");
 
         col.innerHTML = `
-            <div class="card producto-card ${!p.disponible ? 'agotado' : ''}"
+            <div class="card producto-card h-100 ${!p.disponible ? 'agotado' : ''}"
                  onclick="${p.disponible ? `handleProductoTap(this, ${p.id}, '${nombreSeguro}', ${p.precio})` : ''}">
-                <div class="card-body text-center p-2">
+                <div class="producto-img-container">
                     ${img}
-                    <p class="fw-bold mb-1 small">${p.nombre}</p>
-                    ${tieneSabores ? '<small class="text-muted d-block">Con sabores</small>' : '<small class="text-muted d-block">Sabor fijo</small>'}
-                    <span class="badge bg-dark">$${p.precio.toFixed(2)}</span>
-                    ${!p.disponible ? '<br><small class="text-danger">Agotado</small>' : ''}
+                    <div class="producto-precio-badge">$${p.precio.toFixed(2)}</div>
+                    ${badgeSabores}
+                </div>
+                <div class="card-body p-2 d-flex flex-column justify-content-center text-center">
+                    <h6 class="fw-bold mb-0 lh-sm text-dark" style="font-size: 0.85rem;">${p.nombre}</h6>
+                    ${!p.disponible ? '<small class="text-danger fw-bold mt-1">Agotado</small>' : ''}
                 </div>
             </div>`;
         contenedor.appendChild(col);
@@ -361,6 +360,9 @@ function actualizarResumen() {
                 <small class="text-muted">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${pedidoActual.tipo === 'delivery' ? '<span class="text-warning" style="font-size: 0.65rem;">(+0.25)</span>' : ''}</small>
             </div>
             <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-color: #e5e7eb;" onclick="editarObservacion(${item.producto_id}, ${saborSeguro ? `'${saborSeguro}'` : 'null'})" title="Añadir Observación">
+                    <i class="bi bi-pencil text-muted"></i>
+                </button>
                 <span class="text-success fw-bold small">$${subtotal.toFixed(2)}</span>
                 <button class="btn btn-sm btn-outline-danger py-0" onclick="quitarProducto(${item.producto_id}, ${saborSeguro ? `'${saborSeguro}'` : 'null'})">
                     <i class="bi bi-dash"></i>
@@ -369,13 +371,13 @@ function actualizarResumen() {
 
         if (contenedor) {
             const div = document.createElement('div');
-            div.className = 'list-group-item d-flex justify-content-between align-items-center px-0 py-2';
+            div.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
             div.innerHTML = html;
             contenedor.appendChild(div);
         }
         if (contenedorMobile) {
             const divM = document.createElement('div');
-            divM.className = 'list-group-item d-flex justify-content-between align-items-center px-0 py-2';
+            divM.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
             divM.innerHTML = html;
             contenedorMobile.appendChild(divM);
         }
@@ -422,6 +424,22 @@ function quitarProducto(id, sabor = null) {
     }
 
     actualizarResumen();
+}
+
+function editarObservacion(id, sabor = null) {
+    if (navigator.vibrate) navigator.vibrate(15);
+    const item = pedidoActual.productos.find(
+        (p) => p.producto_id === id && (p.sabor || null) === (sabor || null)
+    );
+
+    if (!item) return;
+
+    const nuevaNota = prompt(`Detalle / Observación para:\n${item.nombre}`, item.sabor || "");
+    
+    if (nuevaNota !== null) { 
+        item.sabor = nuevaNota.trim() !== "" ? nuevaNota.trim() : null;
+        actualizarResumen();
+    }
 }
 
 function abrirCheckout() {
