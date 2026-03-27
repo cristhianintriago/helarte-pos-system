@@ -6,7 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(actualizarReloj, 60000);
 
     cargarComandas();
-    setInterval(cargarComandas, 3000);
+    setInterval(cargarComandas, 8000); // 8s reduce drásticamente la carga de red en tablets
 });
 
 function actualizarReloj() {

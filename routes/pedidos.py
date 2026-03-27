@@ -268,18 +268,10 @@ def crear_pedido():
         sabores_permitidos = {s.nombre for s in producto.sabores if s.activo}
         max_sabores = int(producto.max_sabores or 1)
 
-        if sabores_permitidos:
-            if not sabores_seleccionados:
-                return jsonify({'error': f'Debes seleccionar al menos 1 sabor para {producto.nombre}'}), 400
-
-            if len(sabores_seleccionados) > max_sabores:
-                return jsonify({'error': f'{producto.nombre} permite maximo {max_sabores} sabor(es)'}), 400
-
-            invalidos = [s for s in sabores_seleccionados if s not in sabores_permitidos]
-            if invalidos:
-                return jsonify({'error': f'Sabor no permitido para {producto.nombre}: {", ".join(invalidos)}'}), 400
-        elif sabores_seleccionados:
-            return jsonify({'error': f'{producto.nombre} no tiene sabores configurados'}), 400
+        # Relajamos la validación estricta de nombres de sabor para permitir que el frontend
+        # envíe Notas y Observaciones libres (ej: "Sin azúcar") dentro del campo de sabor.
+        if sabores_permitidos and not sabores_seleccionados:
+            return jsonify({'error': f'Debes detallar {producto.nombre}'}), 400
 
         # Cargo automático de $0.25 adicional por item si es delivery
         precio_final = producto.precio + (0.25 if datos.get('tipo') == 'delivery' else 0.0)
