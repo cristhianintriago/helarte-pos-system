@@ -326,6 +326,12 @@ def crear_pedido():
 
     db.session.commit()
 
+    try:
+        from extensions import socketio
+        socketio.emit('actualizar_cocina', {'mensaje': 'Nuevo pedido', 'id': nuevo_pedido.id})
+    except Exception as e:
+        print(f"Error emitiendo socket: {e}")
+
     return jsonify({
         'mensaje': 'Pedido creado correctamente',
         'id': nuevo_pedido.id,
@@ -385,6 +391,12 @@ def cambiar_estado(pedido_id):
     # solo se encargue del flujo operativo y no del financiero.
 
     db.session.commit()
+    try:
+        from extensions import socketio
+        socketio.emit('actualizar_cocina', {'mensaje': 'Estado actualizado'})
+    except Exception:
+        pass
+
     return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado}'})
 
 
@@ -417,6 +429,13 @@ def eliminar_pedido(pedido_id):
         DetallePedido.query.filter_by(pedido_id=pedido.id).delete()
         db.session.delete(pedido)
         db.session.commit()
+        
+        try:
+            from extensions import socketio
+            socketio.emit('actualizar_cocina', {'mensaje': 'Pedido eliminado'})
+        except Exception:
+            pass
+
     except Exception:
         db.session.rollback()
         return jsonify({'error': 'Ocurrió un problema al eliminar el pedido'}), 500

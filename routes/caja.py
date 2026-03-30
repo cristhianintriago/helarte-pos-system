@@ -15,9 +15,10 @@ def abrir_caja():
     from flask_login import current_user
 
     hoy = date.today()
-    caja_hoy = Caja.query.filter(
-        db.cast(Caja.fecha, db.Date) == hoy
-    ).first()
+    from datetime import datetime, time
+    inicio_hoy = datetime.combine(hoy, time.min)
+    fin_hoy = datetime.combine(hoy, time.max)
+    caja_hoy = Caja.query.filter(Caja.fecha >= inicio_hoy, Caja.fecha <= fin_hoy).first()
 
     if caja_hoy:
         if caja_hoy.estado == 'abierta':
@@ -64,21 +65,39 @@ def cerrar_caja():
     if not caja:
         return jsonify({'error': 'No hay caja abierta'}), 400
 
-    # Calculamos el monto final base 
+    datos = request.json or {}
+    monto_declarado = datos.get('monto_declarado')
+
+    if monto_declarado is None:
+        return jsonify({'error': 'Debes declarar el monto fisico en caja para certificar el cierre'}), 400
+        
+    try:
+        monto_declarado = float(monto_declarado)
+    except ValueError:
+        return jsonify({'error': 'El monto declarado no es valido'}), 400
+
+    # Calculamos el monto final base y el efectivo real esperado en gaveta
     caja.monto_final = caja.monto_inicial + caja.total_ingresos - caja.total_egresos
+    efectivo_esperado = caja.monto_inicial + (caja.total_efectivo or 0.0) - caja.total_egresos
+    
+    # Ejecutamos el Blind Close
+    caja.monto_declarado = monto_declarado
+    caja.descuadre = monto_declarado - efectivo_esperado
     caja.estado = 'cerrada'
 
     db.session.commit()
 
     return jsonify({
-        'mensaje': 'Caja cerrada correctamente',
+        'mensaje': 'Caja cerrada auditada correctamente',
         'monto_inicial': caja.monto_inicial,
         'total_ingresos': caja.total_ingresos,
         'total_efectivo': caja.total_efectivo,
         'total_transferencia': caja.total_transferencia,
         'total_egresos': caja.total_egresos,
         'monto_final': caja.monto_final,
-        'efectivo_en_caja': caja.monto_inicial + (caja.total_efectivo or 0) - caja.total_egresos
+        'efectivo_esperado': efectivo_esperado,
+        'monto_declarado': caja.monto_declarado,
+        'descuadre': caja.descuadre
     })
 
 
@@ -100,7 +119,9 @@ def reiniciar_caja():
     if not caja:
         # Si está cerrada, la reabrimos y reiniciamos sus contadores
         hoy = date.today()
-        caja = Caja.query.filter(db.cast(Caja.fecha, db.Date) == hoy).first()
+        from datetime import datetime, time
+        inicio, fin = datetime.combine(hoy, time.min), datetime.combine(hoy, time.max)
+        caja = Caja.query.filter(Caja.fecha >= inicio, Caja.fecha <= fin).first()
         if not caja:
             return jsonify({'error': 'No hay caja registrada hoy'}), 404
         caja.estado = 'abierta'
@@ -117,7 +138,8 @@ def reiniciar_caja():
 
     # Eliminamos también las ventas del día para que el módulo de Ventas quede limpio
     hoy = date.today()
-    ventas_hoy = Venta.query.filter(db.cast(Venta.fecha, db.Date) == hoy).all()
+    inicio, fin = datetime.combine(hoy, time.min), datetime.combine(hoy, time.max)
+    ventas_hoy = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
     for v in ventas_hoy:
         db.session.delete(v)
 
@@ -154,11 +176,17 @@ def estado_caja():
 @caja_bp.route('/egresos', methods=['GET'])
 @login_required
 def obtener_egresos():
-    # ✅ Busca por la caja de HOY sin importar si está abierta o cerrada
-    hoy = date.today()
-    caja = Caja.query.filter(
-        db.cast(Caja.fecha, db.Date) == hoy
-    ).first()
+    # ✅ Prioriza siempre la caja que esté ABIERTA (recibiendo ventas y egresos)
+    caja = Caja.query.filter_by(estado='abierta').first()
+    
+    if not caja:
+        # Si no hay caja abierta, busca la de HOY por si quieren ver el historial tras cerrarla
+        hoy = date.today()
+        from datetime import datetime, time
+        caja = Caja.query.filter(
+            Caja.fecha >= datetime.combine(hoy, time.min), 
+            Caja.fecha <= datetime.combine(hoy, time.max)
+        ).first()
 
     if not caja:
         return jsonify([])
@@ -173,12 +201,13 @@ def obtener_egresos():
 @caja_bp.route('/historial', methods=['GET'])
 @login_required
 def historial_cajas():
-    from datetime import date, timedelta
+    from datetime import date, timedelta, datetime, time
     hace_30_dias = date.today() - timedelta(days=30)
+    inicio_30 = datetime.combine(hace_30_dias, time.min)
 
     cajas = Caja.query.filter(
         Caja.estado == 'cerrada',
-        db.cast(Caja.fecha, db.Date) >= hace_30_dias
+        Caja.fecha >= inicio_30
     ).order_by(Caja.fecha.desc()).all()
 
     return jsonify([{
@@ -223,9 +252,10 @@ def eliminar_registros_caja():
 
         # Eliminamos las ventas del día de esta caja
         fecha_caja = caja.fecha.date()
-        ventas_del_dia = Venta.query.filter(
-            db.cast(Venta.fecha, db.Date) == fecha_caja
-        ).all()
+        from datetime import datetime, time
+        inicio = datetime.combine(fecha_caja, time.min)
+        fin = datetime.combine(fecha_caja, time.max)
+        ventas_del_dia = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
         for v in ventas_del_dia:
             db.session.delete(v)
 

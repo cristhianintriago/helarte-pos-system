@@ -132,6 +132,8 @@ class Caja(db.Model):
     estado = db.Column(db.String(20), default='abierta')
     total_efectivo = db.Column(db.Float, default=0.0)
     total_transferencia = db.Column(db.Float, default=0.0)
+    monto_declarado = db.Column(db.Float, nullable=True)  # Efectivo real contado por el cajero
+    descuadre = db.Column(db.Float, nullable=True)        # Faltante (-) o Soobrante (+)
 
 
 # ==========================================

@@ -12,7 +12,7 @@ async function verificarCaja() {
         divCerrada.style.display = 'none';
         divAbierta.style.display = 'block';
         mostrarCajaAbierta(datos);
-        cargarEgresos();
+        await cargarEgresos();
 
         // Mostramos la sección admin solo si el usuario tiene permiso
         const seccionAdmin = document.getElementById('seccion-admin');
@@ -32,8 +32,7 @@ function mostrarCajaAbierta(datos) {
     // ── NUEVO: desglose por forma de pago
     document.getElementById('resumen-efectivo').textContent      = `$${(datos.total_efectivo || 0).toFixed(2)}`;
     document.getElementById('resumen-transferencia').textContent = `$${(datos.total_transferencia || 0).toFixed(2)}`;
-    const cajonEl = document.getElementById('resumen-efectivo-caja');
-    if (cajonEl) cajonEl.textContent = `$${(datos.efectivo_en_caja || 0).toFixed(2)}`;
+    // Ocultado por Blind Close (no se le muestra al cajero cuánto efectivo debería haber)
 }
 
 
@@ -82,7 +81,6 @@ async function registrarEgreso() {
         document.getElementById('egreso-monto').value = '';
         mostrarToast('Egreso registrado correctamente', 'success');
         await verificarCaja();
-        await cargarEgresos();
     } else {
         mostrarToast(datos.error || 'Error al registrar egreso', 'danger');
     }
@@ -90,7 +88,7 @@ async function registrarEgreso() {
 
 
 async function cargarEgresos() {
-    const respuesta = await fetch('/caja/egresos');
+    const respuesta = await fetch(`/caja/egresos?t=${Date.now()}`);
     const egresos = await respuesta.json();
 
     const contenedor = document.getElementById('lista-egresos');
@@ -118,53 +116,109 @@ async function cargarEgresos() {
 }
 
 
+let blindCloseModal = null;
+
+document.addEventListener('DOMContentLoaded', () => {
+    const blindModalEl = document.getElementById('modal-blind-close');
+    if (blindModalEl) {
+        blindCloseModal = new bootstrap.Modal(blindModalEl);
+    }
+});
+
+function iniciarCierreCaja() {
+    document.getElementById('monto-declarado').value = '';
+    if (blindCloseModal) blindCloseModal.show();
+}
+
+
 async function cerrarCaja() {
-    if (!confirm('¿Estás segura de que deseas cerrar la caja?')) return;
+    const montoDeclarado = parseFloat(document.getElementById('monto-declarado').value);
+    
+    if (isNaN(montoDeclarado) || montoDeclarado < 0) {
+        mostrarToast('Debes ingresar la cantidad de dinero exacta que tienes contada', 'warning');
+        return;
+    }
 
-    const respuesta = await fetch('/caja/cerrar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-    });
+    if (!confirm(`¿Confirmas disponer exactamente de $${montoDeclarado.toFixed(2)} físicos en la caja? Esta acción auditará y cerrará el turno.`)) return;
 
-    const datos = await respuesta.json();
+    const btnClose = document.querySelector('#modal-blind-close .btn-danger');
+    const originalText = btnClose.innerHTML;
+    btnClose.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Auditando...';
+    btnClose.disabled = true;
 
-    if (respuesta.ok) {
-        // ── NUEVO: modal de cuadre con desglose de forma de pago
-        const contenido = document.getElementById('contenido-cuadre');
-        contenido.innerHTML = `
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item d-flex justify-content-between">
-                    <span>Monto inicial</span>
-                    <strong>$${datos.monto_inicial.toFixed(2)}</strong>
-                </li>
-                <li class="list-group-item d-flex justify-content-between">
-                    <span>Total ingresos</span>
-                    <strong class="text-success">+$${datos.total_ingresos.toFixed(2)}</strong>
-                </li>
-                <li class="list-group-item d-flex justify-content-between ps-4">
-                    <span class="text-muted small">💵 Efectivo</span>
-                    <strong class="text-success small">$${(datos.total_efectivo || 0).toFixed(2)}</strong>
-                </li>
-                <li class="list-group-item d-flex justify-content-between ps-4">
-                    <span class="text-muted small">📲 Transferencia</span>
-                    <strong class="text-info small">$${(datos.total_transferencia || 0).toFixed(2)}</strong>
-                </li>
-                <li class="list-group-item d-flex justify-content-between">
-                    <span>Total egresos</span>
-                    <strong class="text-danger">-$${datos.total_egresos.toFixed(2)}</strong>
-                </li>
-                <li class="list-group-item d-flex justify-content-between fs-6 bg-light text-muted">
-                    <span>Balance Contable General</span>
-                    <strong>$${datos.monto_final.toFixed(2)}</strong>
-                </li>
-                <li class="list-group-item d-flex justify-content-between fs-4 shadow-sm" style="background-color: #d1e7dd; border-top: 3px dashed #198754;">
-                    <span class="text-success fw-bold">Efectivo a rendir</span>
-                    <strong class="text-success">$${(datos.efectivo_en_caja || 0).toFixed(2)}</strong>
-                </li>
-            </ul>`;
-        new bootstrap.Modal(document.getElementById('modal-cuadre')).show();
-    } else {
-        mostrarToast(datos.error, 'danger');
+    try {
+        const respuesta = await fetch('/caja/cerrar', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ monto_declarado: montoDeclarado })
+        });
+
+        const datos = await respuesta.json();
+
+        if (respuesta.ok) {
+            if (blindCloseModal) blindCloseModal.hide();
+            
+            let descuadreHTML = '';
+            if (datos.descuadre === 0) {
+                descuadreHTML = `<strong class="text-success"><i class="bi bi-check-circle-fill"></i> Cuadre Perfecto ($0.00)</strong>`;
+            } else if (datos.descuadre > 0) {
+                descuadreHTML = `<strong class="text-primary"><i class="bi bi-arrow-up-circle-fill"></i> Sobrante (+$${datos.descuadre.toFixed(2)})</strong>`;
+            } else {
+                descuadreHTML = `<strong class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Faltante (-$${Math.abs(datos.descuadre).toFixed(2)})</strong>`;
+            }
+
+            const contenido = document.getElementById('contenido-cuadre');
+            contenido.innerHTML = `
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Monto inicial</span>
+                        <strong>$${datos.monto_inicial.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Total ingresos</span>
+                        <strong class="text-success">+$${datos.total_ingresos.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between ps-4 border-0 pb-0">
+                        <span class="text-muted small">💵 Efectivo</span>
+                        <strong class="text-success small">$${(datos.total_efectivo || 0).toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between ps-4 pt-1">
+                        <span class="text-muted small">📲 Transferencia</span>
+                        <strong class="text-info small">$${(datos.total_transferencia || 0).toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        <span>Total egresos</span>
+                        <strong class="text-danger">-$${datos.total_egresos.toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between fs-6 bg-light text-muted">
+                        <span>Sistema (Efectivo Esperado)</span>
+                        <strong>$${(datos.efectivo_esperado || 0).toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between fs-6" style="background-color: #fff3cd;">
+                        <span class="fw-bold">Efectivo Declarado (Tú)</span>
+                        <strong class="fs-5">$${(datos.monto_declarado || 0).toFixed(2)}</strong>
+                    </li>
+                    <li class="list-group-item d-flex mt-2 justify-content-between fs-5 shadow-sm rounded border-0 bg-white">
+                        <span class="fw-bold text-dark">Diferencia Auditada</span>
+                        ${descuadreHTML}
+                    </li>
+                </ul>`;
+            
+            // Añadir listener para cuando se cierre el modal de cuadre se refresque
+            const modalCuadre = document.getElementById('modal-cuadre');
+            if (modalCuadre) {
+                modalCuadre.addEventListener('hidden.bs.modal', function () {
+                    location.reload();
+                });
+            }
+
+            new bootstrap.Modal(document.getElementById('modal-cuadre')).show();
+        } else {
+            mostrarToast(datos.error, 'danger');
+        }
+    } finally {
+        btnClose.innerHTML = originalText;
+        btnClose.disabled = false;
     }
 }
 

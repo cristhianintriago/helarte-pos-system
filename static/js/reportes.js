@@ -5,8 +5,17 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 let graficoHoy = null;
+let graficoTopProductos = null;
+let graficoPagos = null;
 
-// Establece fechas rápidas
+// Colores UI Premium Helarte
+const baseColors = [
+  'rgba(255, 99, 132, 0.8)',   // Rosa/Rojo
+  'rgba(54, 162, 235, 0.8)',   // Azul
+  'rgba(255, 206, 86, 0.8)',   // Amarillo
+  'rgba(75, 192, 192, 0.8)',   // Verde menta
+  'rgba(153, 102, 255, 0.8)'   // Púrpura
+];
 function setPeriodo(periodo) {
   const hoy = new Date();
   const hasta = hoy.toISOString().split("T")[0];
@@ -97,6 +106,54 @@ async function cargarReporte() {
                 <span>${medallas[i] || "🍦"} ${p.nombre}</span>
                 <span class="badge bg-dark">${p.cantidad} vendidos</span>`;
       listaTop.appendChild(div);
+    });
+  }
+
+  // 1. Dibuja el Gráfico de Top Productos
+  const ctxTop = document.getElementById('grafico-top-productos');
+  if (ctxTop) {
+    if (graficoTopProductos) graficoTopProductos.destroy();
+    graficoTopProductos = new Chart(ctxTop, {
+      type: 'doughnut',
+      data: {
+        labels: datos.top_productos.map(p => p.nombre),
+        datasets: [{
+          data: datos.top_productos.map(p => p.cantidad),
+          backgroundColor: baseColors,
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right' }
+        }
+      }
+    });
+  }
+
+  // 2. Dibuja el Gráfico de Desglose de Pagos
+  const ctxPagos = document.getElementById('grafico-pagos');
+  if (ctxPagos && datos.desglose_pagos) {
+    if (graficoPagos) graficoPagos.destroy();
+    graficoPagos = new Chart(ctxPagos, {
+      type: 'pie',
+      data: {
+        labels: ['Efectivo', 'Transferencia'],
+        datasets: [{
+          data: [datos.desglose_pagos.efectivo, datos.desglose_pagos.transferencia],
+          backgroundColor: ['rgba(75, 192, 192, 0.8)', 'rgba(54, 162, 235, 0.8)'], // Verde y Azul
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
     });
   }
 }

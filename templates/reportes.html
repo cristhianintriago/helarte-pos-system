@@ -125,7 +125,34 @@ contenido %}
   </div>
 </div>
 
-<div class="row g-4">
+<!-- NUEVOS GRÁFICOS (Fase 4: Inteligencia de Negocio) -->
+<div class="row g-4 mb-4">
+  <!-- PRODUCTOS TOP (CHART) -->
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-dark text-white">
+        <i class="bi bi-pie-chart-fill text-warning"></i> Top 5 Productos
+      </div>
+      <div class="card-body d-flex justify-content-center" style="height: 300px;">
+        <canvas id="grafico-top-productos"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- DESGLOSE DE PAGO (CHART) -->
+  <div class="col-md-6">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-dark text-white">
+        <i class="bi bi-wallet2 text-success"></i> Efectivo vs Transferencia
+      </div>
+      <div class="card-body d-flex justify-content-center" style="height: 300px;">
+        <canvas id="grafico-pagos"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-4 mb-4">
   <!-- VENTAS POR DÍA -->
   <div class="col-md-6">
     <div class="card shadow-sm">

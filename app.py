@@ -12,6 +12,7 @@ from flask import Flask, redirect, render_template, jsonify, url_for
 from flask_login import LoginManager, login_required, current_user
 
 # Importaciones de nuestros modelos de la base de datos (BD)
+from extensions import socketio
 from models.models import db
 from models.usuario import Usuario
 
@@ -55,6 +56,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # La clave secreta es necesaria para mantener sesiones seguras
 app.secret_key = os.environ.get('SECRET_KEY', 'helarte_secret_key')
+
 # Desactivamos el caché de archivos estáticos para que el browser siempre cargue el JS/CSS más reciente
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 app.config['TEMPLATES_AUTO_RELOAD'] = True
@@ -74,6 +76,7 @@ def load_user(user_id):
 
 # Se inicializa SQLAlchemy en nuestra app
 db.init_app(app)
+socketio.init_app(app)
 
 # ── Flask-Bcrypt: biblioteca para hasheo seguro de contraseñas con bcrypt ──
 # A diferencia de SHA-256, bcrypt incluye salt automático y es resistente a ataques de fuerza bruta.
@@ -287,4 +290,4 @@ def limpiar_datos():
 # Main point: Inicia el levantamiento del proceso o servidor web local (en este caso en el puerto port)
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port)
+    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
