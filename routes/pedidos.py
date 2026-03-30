@@ -1,3 +1,29 @@
+"""
+routes/pedidos.py
+-----------------
+Blueprint principal de la operacion de la heladeria: gestion del ciclo de vida de pedidos.
+
+Ciclo de vida de un pedido:
+  pendiente -> en_proceso -> preparado -> entregado
+
+Flujo financiero (importante):
+  La venta y el impacto en la caja se registran INMEDIATAMENTE al crear el pedido,
+  no al entregarlo. Esto garantiza que el registro contable sea exacto incluso si
+  un pedido queda en estado intermedio. Si un pedido se cancela, se hace rollback
+  (reversion) del impacto en la caja.
+
+Generacion de PDF (ReportLab):
+  ReportLab es una libreria Python para crear documentos PDF desde codigo.
+  Funciona con un sistema de "elementos" que se apilan verticalmente:
+  Paragraph (texto formateado), Table (cuadricula de datos), Spacer (espacio vacio).
+  El documento se construye en memoria usando BytesIO (no se escribe en disco).
+
+WebSockets:
+  Cuando se crea, cambia de estado o cancela un pedido, se emite un evento
+  a traves de SocketIO. La pantalla de cocina (cocina.js) escucha este evento
+  y actualiza la vista automaticamente sin necesidad de recargar la pagina.
+"""
+
 from flask import Blueprint, jsonify, request, send_file
 from flask_login import login_required, current_user
 from models.models import db, Pedido, DetallePedido, Producto, Venta, Caja, ConfiguracionSistema
@@ -16,64 +42,103 @@ pedidos_bp = Blueprint('pedidos', __name__, url_prefix='/pedidos')
 
 
 # ==========================================
-# HELPERS DE NUMERACION VISUAL DE TICKETS
+# FUNCIONES AUXILIARES: NUMERACION DE TICKETS
 # ==========================================
+# El numero de ticket es un identificador visual del 1 al 50 que se muestra
+# en la pantalla de cocina. Es ciclico: despues del 50 vuelve al 1.
+# Se guarda en la tabla 'configuracion_sistema' con la clave 'contador_ticket_diario'.
+
 def _calcular_siguiente_numero_pedido():
+    """Retorna el numero de ticket visual que le corresponde al proximo pedido."""
     config = _obtener_o_inicializar_contador_tickets()
     return int(config.valor_entero or 1)
 
 
 def _obtener_o_inicializar_contador_tickets():
+    """
+    Obtiene el registro del contador desde la base de datos.
+    Si no existe o esta fuera del rango valido (1-50), lo reinicia a 1.
+    """
     config = ConfiguracionSistema.query.filter_by(clave='contador_ticket_diario').first()
     if config and config.valor_entero and 1 <= int(config.valor_entero) <= 50:
         return config
 
+    # El registro no existe: lo creamos con valor inicial 1.
     if not config:
         config = ConfiguracionSistema(clave='contador_ticket_diario', valor_entero=1)
     else:
         config.valor_entero = 1
 
     db.session.add(config)
+    # flush() aplica el cambio a la sesion de BD en memoria, pero NO hace commit.
+    # Esto nos da el ID del nuevo objeto sin confirmar la transaccion todavia.
     db.session.flush()
     return config
 
 
 def _avanzar_contador_tickets():
+    """
+    Incrementa el contador de tickets en 1.
+    Si llega a 50, vuelve a 1 (comportamiento ciclico: modulo 50).
+    """
     config = _obtener_o_inicializar_contador_tickets()
     actual = int(config.valor_entero or 1)
-    # Contador circular 1..50 para numeracion visual diaria.
+    # El operador % (modulo) calcula el residuo de la division.
+    # (50 % 50) + 1 = 1, lo que provoca el reinicio al llegar al limite.
     config.valor_entero = (actual % 50) + 1
     db.session.add(config)
 
 
 def _numero_visual_pedido(pedido):
+    """Retorna el numero de ticket del pedido como entero, o 0 si no tiene asignado."""
     if pedido.numero_pedido and pedido.numero_pedido > 0:
         return int(pedido.numero_pedido)
     return 0
 
 
 def _obtener_ticket_path(pedido_id):
+    """
+    Construye la ruta del archivo PDF del ticket en el sistema de archivos local.
+    Los tickets se guardan en la carpeta 'instance/tickets/' del proyecto.
+    os.makedirs con exist_ok=True crea la carpeta si no existe, sin lanzar error si ya existe.
+    """
     tickets_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'instance', 'tickets')
     os.makedirs(tickets_dir, exist_ok=True)
     return os.path.join(tickets_dir, f'ticket_pedido_{pedido_id}.pdf')
 
 
 # ==========================================
-# HELPERS DE TICKET PDF
+# FUNCIONES AUXILIARES: GENERACION DE PDF
 # ==========================================
+
 def _construir_ticket_pdf(pedido):
+    """
+    Construye el PDF del ticket de un pedido usando la libreria ReportLab.
+
+    ReportLab funciona con un modelo de "flujo de contenido":
+    1. Se crea un SimpleDocTemplate con el tamano de pagina y los margenes.
+    2. Se define una lista de 'elementos' (Paragraph, Spacer, Table).
+    3. doc.build(elementos) renderiza el PDF y lo escribe en el buffer.
+
+    Todo se construye en memoria usando io.BytesIO, sin crear archivos temporales en disco.
+    Esto es mas eficiente y funciona bien en servidores en la nube como Railway.
+    """
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
+    doc    = SimpleDocTemplate(
         buffer,
         pagesize=letter,
-        leftMargin=0.6 * inch,
+        leftMargin=0.6  * inch,
         rightMargin=0.6 * inch,
-        topMargin=0.5 * inch,
+        topMargin=0.5   * inch,
         bottomMargin=0.5 * inch,
     )
-    styles = getSampleStyleSheet()
+
+    # getSampleStyleSheet provee estilos base (Heading1, Normal, etc.) que podemos
+    # extender o usar como punto de partida para estilos personalizados.
+    styles   = getSampleStyleSheet()
     elementos = []
 
+    # Definicion de estilos personalizados para el ticket.
     titulo_style = ParagraphStyle(
         'TicketTitle',
         parent=styles['Heading1'],
@@ -98,17 +163,19 @@ def _construir_ticket_pdf(pedido):
         textColor=colors.HexColor('#202124'),
     )
 
+    # Encabezado del ticket: nombre del negocio y titulo.
     elementos.append(Paragraph('Helarte', titulo_style))
     elementos.append(Paragraph('Ticket de Pedido', sub_style))
 
-    # Bloque de metadatos del ticket.
+    # Tabla de metadatos: numero de ticket, fecha, cliente, tipo de pedido y pago.
     encabezado = [
         ['Ticket #', f'{_numero_visual_pedido(pedido)}'],
-        ['Fecha', pedido.fecha.strftime('%d/%m/%Y %H:%M')],
-        ['Cliente', pedido.cliente_nombre or 'Consumidor final'],
-        ['Tipo', pedido.tipo.title()],
-        ['Pago', pedido.forma_pago.title()],
+        ['Fecha',    pedido.fecha.strftime('%d/%m/%Y %H:%M')],
+        ['Cliente',  pedido.cliente_nombre or 'Consumidor final'],
+        ['Tipo',     pedido.tipo.title()],
+        ['Pago',     pedido.forma_pago.title()],
     ]
+    # Agregamos filas opcionales segun el tipo de pedido.
     if pedido.tipo == 'delivery' and pedido.plataforma:
         encabezado.append(['Plataforma', pedido.plataforma])
     if pedido.numero_comprobante:
@@ -116,122 +183,150 @@ def _construir_ticket_pdf(pedido):
 
     tabla_info = Table(encabezado, colWidths=[2.0 * inch, 4.4 * inch])
     tabla_info.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('TEXTCOLOR', (0, 0), (0, -1), colors.HexColor('#374151')),
-        ('TEXTCOLOR', (1, 0), (1, -1), colors.HexColor('#111827')),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
+        ('FONTNAME',      (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('TEXTCOLOR',     (0, 0), (0, -1), colors.HexColor('#374151')),
+        ('TEXTCOLOR',     (1, 0), (1, -1), colors.HexColor('#111827')),
+        ('FONTSIZE',      (0, 0), (-1, -1), 9),
+        ('LINEBELOW',     (0, -1), (-1, -1), 0.5, colors.HexColor('#d1d5db')),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
     ]))
     elementos.append(tabla_info)
     elementos.append(Spacer(1, 0.16 * inch))
 
-    # Tabla de items del pedido para impresion.
+    # Tabla de items del pedido: producto, cantidad, precio unitario y subtotal.
     data_items = [['Producto', 'Cant.', 'P. Unit.', 'Subtotal']]
     for d in pedido.detalles:
         nombre_producto = d.producto.nombre
+        # Si el item tiene sabor seleccionado, lo incluimos entre parentesis.
         if d.sabor:
             nombre_producto = f"{nombre_producto} ({d.sabor})"
 
         data_items.append([
             nombre_producto,
             str(d.cantidad),
+            # Calculamos el precio unitario dividiendo el subtotal por la cantidad.
             f"${float(d.subtotal) / float(d.cantidad):.2f}",
             f"${float(d.subtotal):.2f}",
         ])
 
     tabla_items = Table(data_items, colWidths=[3.1 * inch, 0.7 * inch, 1.1 * inch, 1.5 * inch])
     tabla_items.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#111827')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
-        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('BACKGROUND',    (0, 0), (-1, 0),  colors.HexColor('#111827')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  'Helvetica-Bold'),
+        ('ALIGN',         (1, 0), (-1, -1), 'RIGHT'),
+        ('FONTSIZE',      (0, 0), (-1, -1), 9),
         ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.25, colors.HexColor('#d1d5db')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('GRID',          (0, 0), (-1, -1), 0.25, colors.HexColor('#d1d5db')),
+        ('TOPPADDING',    (0, 0), (-1, -1), 5),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
     ]))
     elementos.append(tabla_items)
     elementos.append(Spacer(1, 0.16 * inch))
 
+    # Total a pagar y mensaje de cierre del ticket.
     elementos.append(Paragraph(f"<b>Total a pagar: ${float(pedido.total):.2f}</b>", right_style))
     elementos.append(Spacer(1, 0.08 * inch))
     elementos.append(Paragraph('Gracias por preferir Helarte.', sub_style))
 
+    # doc.build() renderiza todos los elementos y escribe el PDF en el buffer.
     doc.build(elementos)
+    # seek(0) mueve el cursor al inicio del buffer para que pueda ser leido desde el principio.
     buffer.seek(0)
     return buffer.getvalue()
 
 
 def _guardar_ticket_pdf(pedido):
+    """
+    Genera el PDF del ticket y lo guarda como archivo en el sistema de archivos local.
+    Retorna la ruta completa del archivo guardado.
+    """
     ticket_path = _obtener_ticket_path(pedido.id)
-    pdf_bytes = _construir_ticket_pdf(pedido)
+    pdf_bytes   = _construir_ticket_pdf(pedido)
     with open(ticket_path, 'wb') as ticket_file:
         ticket_file.write(pdf_bytes)
     return ticket_path
 
 
+# ==========================================
+# GET /pedidos/ -> Lista los pedidos activos
+# ==========================================
 
-# ==========================================
-# GET /pedidos/ → Retorna todos los pedidos activos
-# ==========================================
 @pedidos_bp.route('/', methods=['GET'])
 def obtener_pedidos():
-    # Solo mostramos pedidos que NO están entregados aún
+    """
+    Retorna todos los pedidos que aun no han sido entregados.
+    Este endpoint es consumido por el modulo de cocina para mostrar las comandas activas.
+    Se excluyen los pedidos entregados para que la pantalla de cocina no se llene de historial.
+    """
     pedidos = Pedido.query.filter(Pedido.estado != 'entregado').order_by(Pedido.id.desc()).all()
 
     resultado = []
     for p in pedidos:
-        # Para cada pedido, también enviamos sus productos
+        # Construimos la lista de detalles (items) de cada pedido.
         detalles = []
         for d in p.detalles:
             detalles.append({
                 'producto': d.producto.nombre,
-                'sabor': d.sabor,
+                'sabor':    d.sabor,
                 'cantidad': d.cantidad,
                 'subtotal': d.subtotal
             })
 
         resultado.append({
-            'id': p.id,
-            'numero_pedido': _numero_visual_pedido(p),
-            'tipo': p.tipo,
-            'cliente_nombre': p.cliente_nombre,
-            'cliente_telefono': p.cliente_telefono,
-            'cliente_direccion': p.cliente_direccion,
-            'plataforma': p.plataforma,
-            'estado': p.estado,
-            'total': p.total,
-            'forma_pago': p.forma_pago,
+            'id':                 p.id,
+            'numero_pedido':      _numero_visual_pedido(p),
+            'tipo':               p.tipo,
+            'cliente_nombre':     p.cliente_nombre,
+            'cliente_telefono':   p.cliente_telefono,
+            'cliente_direccion':  p.cliente_direccion,
+            'plataforma':         p.plataforma,
+            'estado':             p.estado,
+            'total':              p.total,
+            'forma_pago':         p.forma_pago,
             'numero_comprobante': p.numero_comprobante,
-            'monto_efectivo': p.monto_efectivo,
+            'monto_efectivo':     p.monto_efectivo,
             'monto_transferencia': p.monto_transferencia,
-            'fecha': p.fecha.strftime('%Y-%m-%d %H:%M'),  # Formato legible
+            # strftime formatea el objeto datetime a un string legible.
+            'fecha':    p.fecha.strftime('%Y-%m-%d %H:%M'),
             'detalles': detalles
         })
 
     return jsonify(resultado)
 
 
+# ==========================================
+# POST /pedidos/ -> Crea un nuevo pedido
+# ==========================================
 
-# ==========================================
-# POST /pedidos/ -> Crea un nuevo pedido con sus productos
-# ==========================================
 @pedidos_bp.route('/', methods=['POST'])
 def crear_pedido():
     """
-    Ruta para la creación de un Pedido en la que recibimos un objeto estructurado en JSON 
-    desde el Frontend, insertamos en BD y iteramos los detalles (productos).
+    Registra un nuevo pedido con todos sus productos en la base de datos.
+
+    Flujo de la funcion:
+    1. Valida el metodo de pago y el comprobante si aplica.
+    2. Crea el objeto Pedido y hace flush() para obtener su ID.
+    3. Itera los productos, valida disponibilidad y sabores, y crea los DetallePedido.
+    4. Calcula el total y valida la suma de montos en pagos mixtos.
+    5. Crea la Venta y actualiza los acumuladores de la Caja abierta.
+    6. Hace commit() para confirmar toda la transaccion a la base de datos.
+    7. Emite el evento WebSocket para notificar a la pantalla de cocina.
+
+    Por que flush() antes de commit():
+    El flush() envia los cambios al motor SQL en memoria (dentro de la misma transaccion).
+    Esto nos permite obtener el ID asignado al nuevo Pedido para usarlo en los DetallePedido,
+    sin confirmar la transaccion hasta que todos los datos esten correctos.
+    Si algo falla antes del commit(), toda la transaccion se revierte automaticamente.
     """
-    datos = request.json
-
+    datos      = request.json
     forma_pago = datos.get('forma_pago', 'efectivo')
-    
-    if forma_pago == 'transferencia' and not datos.get('numero_comprobante'):
-        return jsonify({'error': 'El número de comprobante es requerido para transferencia'}), 400
 
-    # Creamos el pedido principal
+    # Validacion: las transferencias requieren un numero de comprobante.
+    if forma_pago == 'transferencia' and not datos.get('numero_comprobante'):
+        return jsonify({'error': 'El numero de comprobante es requerido para transferencia'}), 400
+
+    # Paso 1: Creamos el encabezado del pedido sin los detalles aun.
     nuevo_pedido = Pedido(
         tipo=datos['tipo'],
         cliente_nombre=datos.get('cliente_nombre', 'Consumidor final'),
@@ -246,61 +341,68 @@ def crear_pedido():
     )
 
     db.session.add(nuevo_pedido)
-    db.session.flush()  # flush() asigna el ID sin hacer commit aún
+    # flush() nos da el ID del pedido para usarlo en los DetallePedido.
+    db.session.flush()
 
-    # Procesamos cada producto del pedido y validamos reglas de sabores.
+    # Paso 2: Procesamos cada producto incluido en el pedido.
     total = 0
     for item in datos['productos']:
         producto = Producto.query.get(item['producto_id'])
 
         if not producto or not producto.disponible:
-            return jsonify({'error': f'Producto no disponible'}), 400
+            return jsonify({'error': 'Producto no disponible'}), 400
 
+        # Normalizamos la lista de sabores seleccionados.
         sabores_seleccionados = item.get('sabores')
         if sabores_seleccionados is None:
-            # Compatibilidad hacia atrás con payload antiguo (campo unico 'sabor').
-            sabor_unico = item.get('sabor')
+            # Compatibilidad con versiones antiguas del frontend que enviaban un campo unico 'sabor'.
+            sabor_unico           = item.get('sabor')
             sabores_seleccionados = [sabor_unico] if sabor_unico else []
 
+        # Limpiamos espacios vacios de la lista de sabores.
         sabores_seleccionados = [str(s).strip() for s in sabores_seleccionados if str(s).strip()]
 
-        # sabores_permitidos representa el catalogo activo por producto.
+        # El catalogo de sabores permitidos para este producto.
         sabores_permitidos = {s.nombre for s in producto.sabores if s.activo}
-        max_sabores = int(producto.max_sabores or 1)
 
-        # Relajamos la validación estricta de nombres de sabor para permitir que el frontend
-        # envíe Notas y Observaciones libres (ej: "Sin azúcar") dentro del campo de sabor.
+        # Si el producto requiere sabor y no se selecciono ninguno, rechazamos el pedido.
+        # (Se permiten observaciones libres, por eso no validamos contra sabores_permitidos estrictamente).
         if sabores_permitidos and not sabores_seleccionados:
             return jsonify({'error': f'Debes detallar {producto.nombre}'}), 400
 
-        # Cargo automático de $0.25 adicional por item si es delivery
+        # Los pedidos delivery tienen un cargo adicional de $0.25 por producto.
         precio_final = producto.precio + (0.25 if datos.get('tipo') == 'delivery' else 0.0)
-        subtotal = precio_final * item['cantidad']
-        total += subtotal
+        subtotal     = precio_final * item['cantidad']
+        total       += subtotal
 
         detalle = DetallePedido(
             pedido_id=nuevo_pedido.id,
             producto_id=producto.id,
             cantidad=item['cantidad'],
             subtotal=subtotal,
+            # Guardamos los sabores como texto separado por comas.
             sabor=', '.join(sabores_seleccionados) if sabores_seleccionados else None
         )
         db.session.add(detalle)
 
-    # Actualizamos el total general del pedido a nivel de la cabecera
+    # Guardamos el total calculado en el encabezado del pedido.
     nuevo_pedido.total = total
-    
-    # Validar montos para pagos mixtos asegurando que la suma coincida con el total.
+
+    # Paso 3: Validacion especial para pagos mixtos (efectivo + transferencia).
     if forma_pago == 'mixto':
         if not datos.get('numero_comprobante'):
-            return jsonify({'error': 'El número de comprobante es requerido para pagos mixtos'}), 400
-        
-        m_efect = nuevo_pedido.monto_efectivo
+            return jsonify({'error': 'El numero de comprobante es requerido para pagos mixtos'}), 400
+
+        m_efect  = nuevo_pedido.monto_efectivo
         m_transf = nuevo_pedido.monto_transferencia
+        # abs() calcula el valor absoluto para comparar sin importar el signo.
+        # Usamos 0.01 como margen de tolerancia por decimales de punto flotante.
         if abs((m_efect + m_transf) - total) > 0.01:
             return jsonify({'error': f'Los montos (Efectivo: ${m_efect:.2f}, Transferencia: ${m_transf:.2f}) no suman el total del pedido (${total:.2f})'}), 400
 
-    # ── NUEVO FLUJO: Registrar Venta y actualizar Caja INMEDIATAMENTE al crear el pedido ──
+    # Paso 4: Registramos la Venta inmediatamente (el registro contable).
+    # Las ventas se crean aqui, no al momento de entrega, para garantizar
+    # que el impacto financiero sea atomico (todo o nada).
     venta = Venta(
         pedido_id=nuevo_pedido.id,
         total=total,
@@ -311,21 +413,28 @@ def crear_pedido():
     )
     db.session.add(venta)
 
+    # Paso 5: Actualizamos los acumuladores de la Caja del dia.
     caja_abierta = Caja.query.filter_by(estado='abierta').first()
     if caja_abierta:
         caja_abierta.total_ingresos += total
+        # Distribuimos el ingreso segun el metodo de pago para el desglose de caja.
         if forma_pago == 'efectivo':
             caja_abierta.total_efectivo += total
         elif forma_pago in ['transferencia', 'pago_pedidosya', 'tarjeta']:
             caja_abierta.total_transferencia += total
         elif forma_pago == 'mixto':
-            caja_abierta.total_efectivo += (nuevo_pedido.monto_efectivo or 0.0)
+            caja_abierta.total_efectivo      += (nuevo_pedido.monto_efectivo      or 0.0)
             caja_abierta.total_transferencia += (nuevo_pedido.monto_transferencia or 0.0)
 
+    # Avanzamos el contador de tickets para el proximo pedido.
     _avanzar_contador_tickets()
 
+    # Paso 6: Confirmamos toda la transaccion en la base de datos.
     db.session.commit()
 
+    # Paso 7: Notificamos a la pantalla de cocina via WebSocket.
+    # El try/except garantiza que si el socket falla, el pedido ya fue guardado
+    # correctamente y la funcion retorna exito de todas formas.
     try:
         from extensions import socketio
         socketio.emit('actualizar_cocina', {'mensaje': 'Nuevo pedido', 'id': nuevo_pedido.id})
@@ -333,17 +442,18 @@ def crear_pedido():
         print(f"Error emitiendo socket: {e}")
 
     return jsonify({
-        'mensaje': 'Pedido creado correctamente',
-        'id': nuevo_pedido.id,
-        'numero_pedido': _numero_visual_pedido(nuevo_pedido),
-        'total': total,
-        'ticket_url': f'/pedidos/{nuevo_pedido.id}/ticket',
+        'mensaje':        'Pedido creado correctamente',
+        'id':             nuevo_pedido.id,
+        'numero_pedido':  _numero_visual_pedido(nuevo_pedido),
+        'total':          total,
+        'ticket_url':     f'/pedidos/{nuevo_pedido.id}/ticket',
         'ticket_guardado': False,
     }), 201
 
 
 @pedidos_bp.route('/contador', methods=['GET'])
 def obtener_siguiente_numero_pedido():
+    """Retorna el numero de ticket que le correspondera al proximo pedido."""
     return jsonify({'siguiente_numero': _calcular_siguiente_numero_pedido()})
 
 
@@ -351,8 +461,8 @@ def obtener_siguiente_numero_pedido():
 @login_required
 def reiniciar_contador_pedidos():
     """
-    Reinicia el contador visual de pedidos al recomputar desde cero.
-    Se recomienda limpiar registros con /limpiar-datos para evitar duplicados visuales.
+    Reinicia el contador visual de tickets a 1 y borra el numero asignado a pedidos anteriores.
+    Exclusivo para root. Se recomienda usar junto con /limpiar-datos para evitar confusion visual.
     """
     if not current_user.puede_eliminar_registros():
         return jsonify({'error': 'No autorizado para reiniciar contador de pedidos'}), 403
@@ -364,6 +474,7 @@ def reiniciar_contador_pedidos():
         else:
             config.valor_entero = 1
 
+        # Borramos el numero asignado a todos los pedidos existentes.
         Pedido.query.update({Pedido.numero_pedido: None})
 
         db.session.add(config)
@@ -372,25 +483,31 @@ def reiniciar_contador_pedidos():
         db.session.rollback()
         return jsonify({'error': 'No se pudo reiniciar el contador de pedidos'}), 500
 
-    return jsonify({'mensaje': 'Contador visual reiniciado. El próximo pedido será #1.'})
+    return jsonify({'mensaje': 'Contador visual reiniciado. El proximo pedido sera #1.'})
+
 
 # ==========================================
-# PUT /pedidos/<id>/estado → Cambia el estado del pedido
-# Cuando se marca como 'entregado', genera una Venta automáticamente
+# PUT /pedidos/<id>/estado -> Cambia el estado
 # ==========================================
+
 @pedidos_bp.route('/<int:pedido_id>/estado', methods=['PUT'])
 def cambiar_estado(pedido_id):
-    pedido = Pedido.query.get_or_404(pedido_id)
-    datos = request.json
+    """
+    Actualiza el estado de un pedido en su ciclo de vida de cocina.
+    Estados posibles: pendiente -> en_proceso -> preparado -> entregado.
+
+    Nota: el impacto financiero (venta y caja) ya fue registrado al crear el pedido.
+    Este endpoint solo actualiza el estado operativo para la pantalla de cocina.
+    Al cambiar el estado, se notifica a la cocina via WebSocket.
+    """
+    pedido       = Pedido.query.get_or_404(pedido_id)
+    datos        = request.json
     nuevo_estado = datos['estado']
 
     pedido.estado = nuevo_estado
-
-    # Ya NO registramos la venta aquí, pues se registra en 'crear_pedido'.
-    # Solo actualizamos el estado del pedido, logrando que la cocina
-    # solo se encargue del flujo operativo y no del financiero.
-
     db.session.commit()
+
+    # Notificamos a la pantalla de cocina que debe actualizar su vista.
     try:
         from extensions import socketio
         socketio.emit('actualizar_cocina', {'mensaje': 'Estado actualizado'})
@@ -400,9 +517,22 @@ def cambiar_estado(pedido_id):
     return jsonify({'mensaje': f'Estado actualizado a {nuevo_estado}'})
 
 
+# ==========================================
+# DELETE /pedidos/<id> -> Cancela un pedido
+# ==========================================
+
 @pedidos_bp.route('/<int:pedido_id>', methods=['DELETE'])
 def eliminar_pedido(pedido_id):
-    """Elimina un pedido activo cuando el cliente cancela la orden."""
+    """
+    Cancela y elimina un pedido activo.
+    Si el pedido ya fue entregado, no se puede cancelar.
+
+    Cuando se cancela un pedido, se revierte el impacto financiero:
+    - Se elimina la Venta asociada.
+    - Se descuentan los montos de los acumuladores de la Caja abierta.
+    - Se eliminan los DetallePedido (items) del pedido.
+    Todo esto ocurre dentro de una transaccion: si algo falla, se hace rollback completo.
+    """
     pedido = Pedido.query.get(pedido_id)
     if not pedido:
         return jsonify({'error': 'El pedido ya no existe o fue eliminado'}), 404
@@ -410,26 +540,32 @@ def eliminar_pedido(pedido_id):
     if pedido.estado == 'entregado':
         return jsonify({'error': 'No se puede eliminar un pedido ya entregado'}), 400
 
-    # Reversar venta y flujos de caja asociados si se elimina un pedido en curso
     try:
+        # Paso 1: revertir el impacto en la caja si existe una venta asociada.
         venta_asociada = Venta.query.filter_by(pedido_id=pedido.id).first()
         if venta_asociada:
             caja_abierta = Caja.query.filter_by(estado='abierta').first()
             if caja_abierta:
+                # Revertimos el total de ingresos de la caja.
                 caja_abierta.total_ingresos -= venta_asociada.total
+                # Revertimos el desglose segun el metodo de pago original.
                 if venta_asociada.forma_pago == 'efectivo':
                     caja_abierta.total_efectivo -= venta_asociada.total
                 elif venta_asociada.forma_pago in ['transferencia', 'pago_pedidosya', 'tarjeta']:
                     caja_abierta.total_transferencia -= venta_asociada.total
                 elif venta_asociada.forma_pago == 'mixto':
-                    caja_abierta.total_efectivo -= (venta_asociada.monto_efectivo or 0.0)
+                    caja_abierta.total_efectivo      -= (venta_asociada.monto_efectivo      or 0.0)
                     caja_abierta.total_transferencia -= (venta_asociada.monto_transferencia or 0.0)
             db.session.delete(venta_asociada)
 
+        # Paso 2: eliminar los items del pedido.
         DetallePedido.query.filter_by(pedido_id=pedido.id).delete()
+
+        # Paso 3: eliminar el pedido.
         db.session.delete(pedido)
         db.session.commit()
-        
+
+        # Notificamos a la cocina que el pedido fue cancelado.
         try:
             from extensions import socketio
             socketio.emit('actualizar_cocina', {'mensaje': 'Pedido eliminado'})
@@ -437,17 +573,28 @@ def eliminar_pedido(pedido_id):
             pass
 
     except Exception:
+        # Si algo falla, revertimos toda la transaccion para no dejar datos inconsistentes.
         db.session.rollback()
-        return jsonify({'error': 'Ocurrió un problema al eliminar el pedido'}), 500
+        return jsonify({'error': 'Ocurrio un problema al eliminar el pedido'}), 500
 
     return jsonify({'mensaje': 'Pedido eliminado correctamente'})
 
 
+# ==========================================
+# GET /pedidos/<id>/ticket -> Descarga el PDF
+# ==========================================
+
 @pedidos_bp.route('/<int:pedido_id>/ticket', methods=['GET'])
 def generar_ticket_pedido(pedido_id):
-    """Genera un ticket imprimible (PDF) para un pedido específico."""
-    pedido = Pedido.query.get_or_404(pedido_id)
+    """
+    Genera y descarga el ticket PDF de un pedido especifico.
+    Si el archivo ya fue generado previamente, lo sirve desde el disco.
+    Si no existe, lo genera en ese momento y lo guarda para futuros usos.
+    """
+    pedido      = Pedido.query.get_or_404(pedido_id)
     ticket_path = _obtener_ticket_path(pedido.id)
+
+    # Generamos el PDF solo si no existe ya en el sistema de archivos.
     if not os.path.exists(ticket_path):
         _guardar_ticket_pdf(pedido)
 
