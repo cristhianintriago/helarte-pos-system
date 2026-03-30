@@ -581,11 +581,17 @@
         </div>
 
         <div class="login-tools reveal-item reveal-delay-3">
+          <!--
+            name="remember_me": este nombre es el que lee el backend en request.form.
+            Flask-Login usa remember=True en login_user() para emitir una cookie
+            permanente que dura REMEMBER_COOKIE_DURATION (por defecto 31 dias).
+          -->
           <div class="form-check m-0">
-            <input class="form-check-input" type="checkbox" id="remember-user">
-            <label class="form-check-label" for="remember-user">Recordar usuario</label>
+            <input class="form-check-input" type="checkbox"
+                   id="remember-user" name="remember_me" value="1">
+            <label class="form-check-label" for="remember-user">Mantener sesion iniciada</label>
           </div>
-          <span class="caps-lock-warning" id="caps-lock-warning">Bloq Mayús activado</span>
+          <span class="caps-lock-warning" id="caps-lock-warning">Bloq Mayus activado</span>
         </div>
 
         <!-- Botón de ingreso -->
@@ -621,12 +627,18 @@
     const eyeIcon   = document.getElementById('eye-icon');
     const loginCard = document.querySelector('.login-card');
     const rememberUser = document.getElementById('remember-user');
-    const capsWarning = document.getElementById('caps-lock-warning');
+    const capsWarning  = document.getElementById('caps-lock-warning');
 
-    // Recordar usuario en este navegador
+    // Restauramos el nombre de usuario guardado en sesiones previas.
     const savedUser = localStorage.getItem('helarte_last_user');
     if (savedUser) {
       userInput.value = savedUser;
+    }
+
+    // Restauramos el estado del checkbox "Mantener sesion iniciada".
+    // localStorage.getItem retorna null si la clave no existe, o el string guardado.
+    const savedRemember = localStorage.getItem('helarte_remember_me');
+    if (savedRemember === '1') {
       rememberUser.checked = true;
     }
 
@@ -668,9 +680,12 @@
       const label = document.getElementById('login-label');
 
       if (rememberUser.checked) {
-        localStorage.setItem('helarte_last_user', userInput.value.trim());
+        // Guardamos el usuario y la preferencia para restaurarlos la proxima vez.
+        localStorage.setItem('helarte_last_user',    userInput.value.trim());
+        localStorage.setItem('helarte_remember_me',  '1');
       } else {
         localStorage.removeItem('helarte_last_user');
+        localStorage.removeItem('helarte_remember_me');
       }
 
       btn.classList.add('loading');

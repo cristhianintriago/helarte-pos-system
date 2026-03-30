@@ -74,8 +74,17 @@ def login():
                     db.session.commit()
 
             if password_valido:
-                # login_user almacena el ID del usuario en la sesion HTTP.
-                login_user(usuario)
+                # El campo 'remember_me' viene del checkbox del formulario.
+                # request.form.get retorna None si el campo no viene en el POST
+                # (los checkboxes NO envian ningun valor cuando NO estan marcados).
+                # Por eso usamos el valor '1' como indicador de que fue marcado.
+                remember = request.form.get('remember_me') == '1'
+
+                # Si remember=True, Flask-Login emite una cookie permanente que
+                # persiste aunque el usuario cierre el navegador. La duracion
+                # se configura con REMEMBER_COOKIE_DURATION en app.py.
+                # Si remember=False (por defecto), la sesion expira al cerrar el navegador.
+                login_user(usuario, remember=remember)
                 return redirect(url_for('index'))
 
         # Si el usuario no existe o la contrasena es incorrecta, mostramos un mensaje de error.

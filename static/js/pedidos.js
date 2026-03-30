@@ -3,6 +3,11 @@
  * ----------
  * Logica del modulo de toma de pedidos (punto de venta).
  *
+ * Integracion con impresora termica Zebra iMZ320:
+ * El boton "Ticket" en la lista de pedidos activos llama a imprimirTicketZebra(),
+ * que esta definida en zebra.js (cargado globalmente en base.html).
+ * Si Zebra Browser Print no esta disponible, zebra.js ofrece el PDF como respaldo.
+ *
  * Este es el archivo mas complejo del frontend. Gestiona:
  * 1. El catalogo de productos con filtros y busqueda en tiempo real.
  * 2. El carrito activo (pedidoActual) con sabores, cantidades y totales.

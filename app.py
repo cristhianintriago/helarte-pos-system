@@ -52,7 +52,7 @@ from routes.admin import admin_bp
 from routes.cocina import cocina_bp
 
 import hashlib
-from datetime import date
+from datetime import date, timedelta
 from flask_bcrypt import Bcrypt
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -103,9 +103,26 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 
 # La vista a la que Flask redirige si el usuario intenta acceder a una ruta protegida.
-login_manager.login_view          = 'auth.login'
-login_manager.login_message       = 'Inicia sesion para continuar'
+login_manager.login_view             = 'auth.login'
+login_manager.login_message          = 'Inicia sesion para continuar'
 login_manager.login_message_category = 'warning'
+
+# Duracion de la cookie "Mantener sesion iniciada".
+# timedelta(days=30): cuando el usuario marca el checkbox, su sesion dura 30 dias
+# aunque cierre el navegador. Sin el checkbox, la sesion expira al cerrar.
+# Flask-Login usa este valor cuando login_user() recibe remember=True.
+app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
+
+# HttpOnly: impide que JavaScript lea la cookie (proteccion contra ataques XSS).
+app.config['REMEMBER_COOKIE_HTTPONLY'] = True
+
+# IMPORTANTE: REMEMBER_COOKIE_SECURE se mantiene en False siempre.
+# Si se activa (True), el navegador SOLO envia la cookie por HTTPS.
+# En local (HTTP), el navegador la rechaza silenciosamente y la sesion
+# nunca se restaura aunque la cookie se haya creado correctamente.
+# En produccion Railway, el servidor ya fuerza HTTPS a nivel de infraestructura,
+# por lo que la seguridad no se ve comprometida con este valor en False.
+app.config['REMEMBER_COOKIE_SECURE']   = False
 
 
 @login_manager.user_loader
