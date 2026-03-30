@@ -70,12 +70,12 @@
             <span class="fw-bold fs-6">Balance Contable Total:</span>
             <span id="resumen-balance" class="fw-bold fs-6 text-primary">$0.00</span>
           </div>
-          <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top: 2px dashed #198754;">
-            <span class="fw-bold fs-5 text-success">EFECTIVO EN CAJA:</span>
-            <span id="resumen-efectivo-caja" class="fw-bold fs-5 text-success">$0.00</span>
+          <div class="d-flex justify-content-between align-items-center mt-3 pt-2" style="border-top: 2px dashed #6c757d;">
+            <span class="fw-bold fs-5 text-muted">EFECTIVO CONTADO:</span>
+            <span class="badge bg-secondary rounded-pill">Secreto (Auditoría)</span>
           </div>
-          <button class="btn btn-danger w-100 mt-4" onclick="cerrarCaja()">
-            <i class="bi bi-lock"></i> Cerrar Caja
+          <button class="btn btn-danger w-100 mt-4 py-2 fw-bold" onclick="iniciarCierreCaja()">
+            <i class="bi bi-lock-fill"></i> Ejecutar Cierre Ciego
           </button>
           <!-- Botón exclusivo para admin/root: reinicia contadores sin borrar el monto inicial -->
           <div id="seccion-admin" style="display: none;">
@@ -136,6 +136,29 @@
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL BLIND CLOSE -->
+<div class="modal fade" id="modal-blind-close" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white border-0">
+        <h5 class="modal-title"><i class="bi bi-safe2"></i> Cierre de Caja Ciego</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center p-4">
+        <p class="text-muted mb-4">Para cerrar la caja, por favor cuenta todo el dinero físico que hay en la gaveta y digítalo aquí.</p>
+        <div class="input-group input-group-lg mb-3">
+          <span class="input-group-text bg-light border-danger text-danger fw-bold">$</span>
+          <input type="number" id="monto-declarado" class="form-control text-center fs-2 fw-bold border-danger text-danger" placeholder="0.00" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger px-4 fw-bold" onclick="cerrarCaja()"><i class="bi bi-shield-lock-fill"></i> Auditar y Cerrar</button>
+      </div>
+    </div>
   </div>
 </div>
 

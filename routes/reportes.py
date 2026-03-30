@@ -44,15 +44,19 @@ def obtener_reporte():
 
     total_vendido = sum(v.total for v in ventas)
 
+    # Cross-platform date grouping: SQLite uses func.date, Postgres uses db.cast
+    is_sqlite = 'sqlite' in str(db.engine.url)
+    date_expr = func.date(Venta.fecha) if is_sqlite else db.cast(Venta.fecha, db.Date)
+
     # Serie temporal agregada para graficos del dashboard.
     ventas_por_dia = db.session.query(
-        db.cast(Venta.fecha, db.Date).label('fecha'),
+        date_expr.label('fecha'),
         func.count(Venta.id).label('cantidad'),
         func.sum(Venta.total).label('total')
     ).filter(
         Venta.fecha >= desde,
         Venta.fecha <= hasta
-    ).group_by(db.cast(Venta.fecha, db.Date)).order_by(db.cast(Venta.fecha, db.Date).desc()).all()
+    ).group_by(date_expr).order_by(date_expr.desc()).all()
 
     # Ranking de productos mas vendidos en el rango.
     top_productos = db.session.query(
@@ -62,6 +66,10 @@ def obtener_reporte():
         Venta.fecha >= desde,
         Venta.fecha <= hasta
     ).group_by(Producto.nombre).order_by(func.sum(DetallePedido.cantidad).desc()).limit(5).all()
+
+    # Desglose de Pagos
+    efectivo = sum(v.total for v in ventas if v.forma_pago == 'Efectivo')
+    transferencia = sum(v.total for v in ventas if v.forma_pago == 'Transferencia')
 
     return jsonify({
         'total_pedidos': len(ventas),
@@ -74,7 +82,11 @@ def obtener_reporte():
         'top_productos': [
             {'nombre': p.nombre, 'cantidad': int(p.cantidad)}
             for p in top_productos
-        ]
+        ],
+        'desglose_pagos': {
+            'efectivo': float(efectivo),
+            'transferencia': float(transferencia)
+        }
     })
 
 

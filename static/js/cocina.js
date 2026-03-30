@@ -1,12 +1,46 @@
 let ultimaSincronizacion = null;
 let htmlAnterior = "";
 
+// ==== WEBSOCKETS (Reemplaza al Polling) ====
+const socket = io();
+
+socket.on('connect', () => {
+    const badge = document.getElementById('estado-conexion');
+    if (badge) {
+        badge.textContent = 'En Línea';
+        badge.className = 'badge bg-success fs-6';
+    }
+});
+
+socket.on('disconnect', () => {
+    const badge = document.getElementById('estado-conexion');
+    if (badge) {
+        badge.textContent = 'Desconectado';
+        badge.className = 'badge bg-danger fs-6';
+    }
+});
+
+socket.on('actualizar_cocina', (data) => {
+    // Cuando desde caja o pedidos.py emiten crear_pedido o cambiar_estado
+    cargarComandas();
+    
+    // Si la caja generó la comanda inicial, lanza aviso verbal
+    if (data.mensaje === 'Nuevo pedido') {
+        const speech = new SpeechSynthesisUtterance("¡Llegó una nueva orden!");
+        speech.lang = 'es-EC';
+        speech.rate = 1.1;
+        window.speechSynthesis.speak(speech);
+    }
+});
+// ============================================
+
 document.addEventListener('DOMContentLoaded', () => {
     actualizarReloj();
     setInterval(actualizarReloj, 60000);
 
+    // Carga inicial
     cargarComandas();
-    setInterval(cargarComandas, 8000); // 8s reduce drásticamente la carga de red en tablets
+    // Ya NO hacemos el setInterval de 8 segundos (Adiós latencia, hola tiempo real)
 });
 
 function actualizarReloj() {
@@ -24,15 +58,10 @@ async function cargarComandas() {
         
         const pedidos = await respuesta.json();
         renderizarComandas(pedidos);
-        
-        const badge = document.getElementById('estado-conexion');
-        if (badge && badge.textContent !== 'En Línea') {
-            badge.textContent = 'En Línea';
-            badge.className = 'badge bg-success fs-6';
-        }
     } catch (err) {
+        // La conexión general falló (sin internet real)
         const badge = document.getElementById('estado-conexion');
-        if (badge) {
+        if (badge && socket.disconnected) {
             badge.textContent = 'Desconectado';
             badge.className = 'badge bg-danger fs-6';
         }
