@@ -145,6 +145,10 @@ def _sincronizar_esquema_legacy():
     _agregar_columna_si_falta('caja', 'total_efectivo', 'ALTER TABLE caja ADD COLUMN total_efectivo FLOAT')
     _agregar_columna_si_falta('caja', 'total_transferencia', 'ALTER TABLE caja ADD COLUMN total_transferencia FLOAT')
 
+    # Columnas de Cierre Ciego (Auditoría)
+    _agregar_columna_si_falta('caja', 'monto_declarado', 'ALTER TABLE caja ADD COLUMN monto_declarado FLOAT')
+    _agregar_columna_si_falta('caja', 'descuadre', 'ALTER TABLE caja ADD COLUMN descuadre FLOAT')
+
     # Normaliza registros antiguos para evitar nulos en reglas de sabores.
     db.session.execute(text('UPDATE productos SET max_sabores = 1 WHERE max_sabores IS NULL OR max_sabores < 1'))
     db.session.commit()
