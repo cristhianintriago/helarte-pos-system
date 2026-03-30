@@ -581,6 +581,177 @@ def eliminar_pedido(pedido_id):
 
 
 # ==========================================
+# FUNCIONES AUXILIARES: GENERACION DE CPCL
+# ==========================================
+# CPCL (Comtec Printer Control Language) es el lenguaje nativo de la iMZ320.
+# Cada linea de un documento CPCL es un comando que la impresora ejecuta en orden.
+#
+# Parametros del encabezado CPCL:
+#   ! <offset> <hdpi> <vdpi> <altura_dots> <copias>
+#   - offset: desplazamiento horizontal (0 = sin offset).
+#   - hdpi/vdpi: resolucion horizontal y vertical (200 para la iMZ320).
+#   - altura_dots: altura total del documento en dots (calculada dinamicamente).
+#   - copias: numero de copias a imprimir.
+#
+# La iMZ320 usa papel de 3 pulgadas (72mm). A 203 DPI el ancho imprimible
+# es de ~576 dots. El comando PW establece el ancho del papel.
+#
+# Comandos clave:
+#   TEXT <fuente> <tamanio> <x> <y> <texto>  -> Imprime texto en la posicion dada.
+#   LINE <x1> <y1> <x2> <y2> <grosor>        -> Dibuja una linea horizontal.
+#   PRINT                                     -> Finaliza e imprime el documento.
+
+def _construir_ticket_cpcl(pedido):
+    """
+    Genera el string CPCL del ticket de un pedido para la impresora Zebra iMZ320.
+
+    El CPCL es texto plano: cada linea es un comando. La funcion construye
+    las lineas dinamicamente segun los items del pedido y retorna el string completo.
+
+    Consideraciones de formato para 72mm (576 dots):
+    - Fuente 0 = fuente vectorial escalable de Zebra.
+    - Tamanios usados: 28 (normal), 32 (subtitulo), 36 (titulo), 48 (total).
+    - El avance vertical (Y) se acumula manualmente segun la altura de cada bloque.
+    """
+    # --- Constantes de layout ---
+    ANCHO_DOTS  = 560   # Ancho imprimible en dots (72mm @ 203 DPI, con margenes).
+    COL_CANT_X  = 370   # Columna de cantidad (alineada a la derecha).
+    COL_PREC_X  = 460   # Columna de precio unitario.
+    INTERLINEA  = 38    # Separacion vertical entre lineas de texto normales (dots).
+
+    # Acumulador de posicion Y. Cada bloque incrementa este valor.
+    y = 20
+    # Lista de comandos CPCL. Al final se unen con saltos de linea.
+    lineas = []
+
+    def agregar_texto(fuente, tam, x, texto, negrita=False):
+        """Agrega un comando TEXT al acumulador y avanza el cursor Y."""
+        nonlocal y
+        cmd_fuente = f"{fuente}" if not negrita else f"{fuente}"
+        lineas.append(f"TEXT {cmd_fuente} {tam} {x} {y} {texto}")
+        y += tam + 10
+
+    def agregar_linea_horizontal():
+        """Agrega una linea horizontal separadora y avanza el cursor Y."""
+        nonlocal y
+        y += 6
+        lineas.append(f"LINE 0 {y} {ANCHO_DOTS} {y} 2")
+        y += 12
+
+    # --- Encabezado del negocio ---
+    lineas.append(f"CENTER")                                     # Alineacion centrada.
+    lineas.append(f"TEXT 4 1 0 {y} HELARTE")                    # Nombre en fuente grande.
+    y += 50
+    lineas.append(f"TEXT 0 28 0 {y} Ticket de Pedido")
+    y += INTERLINEA
+
+    agregar_linea_horizontal()
+
+    # --- Metadatos del pedido ---
+    lineas.append("LEFT")                                        # Cambio a alineacion izquierda.
+    numero_display = _numero_visual_pedido(pedido)
+    fecha_display  = pedido.fecha.strftime('%d/%m/%Y %H:%M')
+    cliente        = (pedido.cliente_nombre or 'Consumidor final')[:28]  # Truncamos para que quepa.
+    tipo_display   = pedido.tipo.upper()
+    pago_display   = pedido.forma_pago.replace('_', ' ').title()
+
+    lineas.append(f"TEXT 0 28 0 {y} Ticket: #{numero_display}")
+    y += INTERLINEA
+    lineas.append(f"TEXT 0 28 0 {y} Fecha:  {fecha_display}")
+    y += INTERLINEA
+    lineas.append(f"TEXT 0 28 0 {y} Cliente: {cliente}")
+    y += INTERLINEA
+    lineas.append(f"TEXT 0 28 0 {y} Tipo:   {tipo_display}")
+    y += INTERLINEA
+    lineas.append(f"TEXT 0 28 0 {y} Pago:   {pago_display}")
+    y += INTERLINEA
+
+    if pedido.numero_comprobante:
+        comp = str(pedido.numero_comprobante)[:20]
+        lineas.append(f"TEXT 0 28 0 {y} Comp:   #{comp}")
+        y += INTERLINEA
+
+    agregar_linea_horizontal()
+
+    # --- Encabezado de la tabla de items ---
+    lineas.append(f"TEXT 0 28 0 {y} Producto")
+    lineas.append(f"TEXT 0 28 {COL_CANT_X} {y} Cant")
+    lineas.append(f"TEXT 0 28 {COL_PREC_X} {y} Total")
+    y += INTERLINEA
+
+    agregar_linea_horizontal()
+
+    # --- Items del pedido ---
+    # Cada item ocupa una o dos lineas segun si tiene sabor.
+    for d in pedido.detalles:
+        nombre = d.producto.nombre[:22]   # Truncamos el nombre si es muy largo.
+        subtotal_str = f"${float(d.subtotal):.2f}"
+
+        lineas.append(f"TEXT 0 28 0 {y} {nombre}")
+        lineas.append(f"TEXT 0 28 {COL_CANT_X} {y} {d.cantidad}x")
+        lineas.append(f"TEXT 0 28 {COL_PREC_X} {y} {subtotal_str}")
+        y += INTERLINEA
+
+        # Si el item tiene sabor, lo imprimimos en una segunda linea con indentacion.
+        if d.sabor:
+            sabor_display = f"  > {d.sabor}"[:30]
+            lineas.append(f"TEXT 0 24 0 {y} {sabor_display}")
+            y += INTERLINEA - 6
+
+    agregar_linea_horizontal()
+
+    # --- Total ---
+    total_str = f"TOTAL: ${float(pedido.total):.2f}"
+    lineas.append(f"CENTER")
+    lineas.append(f"TEXT 4 0 0 {y} {total_str}")    # Fuente grande para el total.
+    y += 48
+
+    agregar_linea_horizontal()
+
+    # --- Mensaje de cierre ---
+    lineas.append(f"TEXT 0 28 0 {y} Gracias por preferir Helarte!")
+    y += INTERLINEA + 20    # Espacio extra antes del corte de papel.
+
+    # --- Ensamblar el documento CPCL ---
+    # El encabezado "! 0 200 200 <altura> 1" abre el documento.
+    # La altura (y) debe calcularse DESPUES de generar todos los comandos.
+    encabezado = f"! 0 200 200 {y} 1\nPW {ANCHO_DOTS}"
+    cuerpo     = "\n".join(lineas)
+    pie        = "PRINT"
+
+    return f"{encabezado}\n{cuerpo}\n{pie}\n"
+
+
+# ==========================================
+# GET /pedidos/<id>/ticket/cpcl -> CPCL para impresora termica
+# ==========================================
+
+@pedidos_bp.route('/<int:pedido_id>/ticket/cpcl', methods=['GET'])
+def generar_ticket_cpcl(pedido_id):
+    """
+    Genera y retorna el string CPCL del ticket de un pedido.
+
+    Este endpoint es consumido por el modulo zebra.js del frontend,
+    que lo envia a la impresora Zebra iMZ320 a traves del daemon
+    Zebra Browser Print corriendo localmente en el PC de caja.
+
+    Retorna text/plain (no JSON) porque el CPCL es un protocolo de texto
+    que se envia directamente a la impresora sin procesamiento adicional.
+
+    El header Access-Control-Allow-Origin es necesario porque Zebra Browser Print
+    realiza la solicitud desde localhost, que es un origen diferente al servidor.
+    """
+    pedido = Pedido.query.get_or_404(pedido_id)
+    cpcl   = _construir_ticket_cpcl(pedido)
+
+    from flask import Response
+    response = Response(cpcl, mimetype='text/plain')
+    # Permitimos que el script del navegador lea esta respuesta desde cualquier origen.
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
+
+
+# ==========================================
 # GET /pedidos/<id>/ticket -> Descarga el PDF
 # ==========================================
 
