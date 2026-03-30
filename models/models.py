@@ -1,39 +1,70 @@
+"""
+models/models.py
+----------------
+Este archivo define el esquema de la base de datos usando SQLAlchemy, que es un ORM
+(Object-Relational Mapping). Un ORM permite tratar las tablas de la base de datos como
+clases de Python y las filas como objetos, sin necesidad de escribir SQL directamente.
+
+Cada clase que hereda de db.Model se convierte en una tabla en la base de datos.
+Cada db.Column se convierte en una columna de esa tabla.
+"""
+
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 
-# Creamos la instancia 'db' de SQLAlchemy, un ORM (Object-Relational Mapping).
-# Esto nos permite interactuar con la base de datos usando objetos Python en lugar de puro código SQL.
+# Se instancia el objeto central de SQLAlchemy. Este objeto 'db' sera pasado
+# a la aplicacion Flask en app.py usando db.init_app(app).
+# Separar la instancia de la app evita importaciones circulares.
 db = SQLAlchemy()
 
 
+# ==========================================
+# TABLA DE ASOCIACION: producto_sabores
+# Relacion Muchos-a-Muchos (N:N)
+# ==========================================
+# Un producto puede tener muchos sabores (ej: Copa Mixta tiene Vainilla, Fresa, Chocolate).
+# Un sabor puede pertenecer a muchos productos (ej: Vainilla aparece en Copa y Sundae).
+# Para representar esto en SQL se usa una tabla intermedia con dos claves foraneas.
 producto_sabores = db.Table(
     'producto_sabores',
     db.Column('producto_id', db.Integer, db.ForeignKey('productos.id'), primary_key=True),
     db.Column('sabor_id', db.Integer, db.ForeignKey('sabores.id'), primary_key=True)
 )
-# Relacion N:N: un producto puede tener multiples sabores y cada sabor pertenecer a multiples productos.
 
 
 # ==========================================
-# TABLA: PRODUCTOS
-# Guarda el menú de la heladería
+# TABLA: productos
+# Almacena el catalogo de helados y productos del menu
 # ==========================================
 class Producto(db.Model):
-    # Definimos explícitamente el nombre de la tabla en SQL
+    # __tablename__ define el nombre exacto de la tabla en la base de datos.
+    # Si no se define, SQLAlchemy usa el nombre de la clase en minusculas.
     __tablename__ = 'productos'
 
-    # db.Column crea las columnas, asignándole el tipo de dato (Integer, String, etc)
-    # primary_key=True define que este campo es el identificador único (Clave Primaria)
+    # primary_key=True indica que este campo es el identificador unico de cada fila.
+    # SQLAlchemy lo incrementa automaticamente (autoincrement).
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)    # Ej: "Copa Oreo" - nullable=False hace que sea un campo obligatorio
-    precio = db.Column(db.Float, nullable=False)          # Ej: 3.50
-    categoria = db.Column(db.String(50), nullable=False)  # Ej: "Copa", "Sundae", "Malteada"
-    disponible = db.Column(db.Boolean, default=True)      # True = está en carta, False = agotado
-    max_sabores = db.Column(db.Integer, default=1)
-    
-    # URL para las imágenes de los productos desde un servicio externo como Cloudinary
-    imagen_url = db.Column(db.String(500), nullable=True) 
 
+    # nullable=False significa que el campo es obligatorio; la BD rechazara un NULL.
+    nombre      = db.Column(db.String(100), nullable=False)   # Ejemplo: "Copa Oreo"
+    precio      = db.Column(db.Float,       nullable=False)   # Ejemplo: 3.50 (en dolares)
+    categoria   = db.Column(db.String(50),  nullable=False)   # Ejemplo: "Copa", "Sundae"
+
+    # default=True: si no se especifica al crear el objeto, SQLAlchemy usa True.
+    disponible  = db.Column(db.Boolean, default=True)         # False = agotado o archivado
+
+    # Maxima cantidad de sabores que el cliente puede elegir para este producto.
+    max_sabores = db.Column(db.Integer, default=1)
+
+    # URL de la imagen almacenada en Cloudinary (servicio externo de imagenes).
+    # nullable=True permite que un producto no tenga imagen asignada.
+    imagen_url  = db.Column(db.String(500), nullable=True)
+
+    # Relacion N:N con Sabor a traves de la tabla de asociacion 'producto_sabores'.
+    # secondary: tabla intermedia que SQLAlchemy usara para los JOIN.
+    # lazy='subquery': carga los sabores junto con la consulta del producto en una sola query.
+    # backref: crea automaticamente el atributo 'productos' dentro del modelo Sabor,
+    #          permitiendo consultar sabor.productos sin definir la relacion dos veces.
     sabores = db.relationship(
         'Sabor',
         secondary=producto_sabores,
@@ -42,116 +73,168 @@ class Producto(db.Model):
     )
 
 
+# ==========================================
+# TABLA: sabores
+# Catalogo de sabores disponibles en la heladeria
+# ==========================================
 class Sabor(db.Model):
     __tablename__ = 'sabores'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id     = db.Column(db.Integer, primary_key=True)
+    # unique=True garantiza que no haya dos sabores con el mismo nombre en la tabla.
     nombre = db.Column(db.String(80), unique=True, nullable=False)
+    # activo=False permite "desactivar" un sabor sin borrarlo, preservando el historial.
     activo = db.Column(db.Boolean, default=True)
 
 
 # ==========================================
-# TABLA: PEDIDOS
+# TABLA: pedidos
+# Representa cada orden realizada por un cliente
 # ==========================================
 class Pedido(db.Model):
     __tablename__ = 'pedidos'
 
-    id = db.Column(db.Integer, primary_key=True)
-    tipo = db.Column(db.String(20), nullable=False) # ej. "domicilio", "mesa"
-    cliente_nombre = db.Column(db.String(100), nullable=False)
-    cliente_telefono = db.Column(db.String(20), nullable=True)
+    id              = db.Column(db.Integer, primary_key=True)
+
+    # Tipo de pedido: "local" (mesa) o "delivery" (domicilio).
+    tipo            = db.Column(db.String(20),  nullable=False)
+    cliente_nombre  = db.Column(db.String(100), nullable=False)
+    cliente_telefono  = db.Column(db.String(20),  nullable=True)
     cliente_direccion = db.Column(db.String(200), nullable=True)
-    plataforma = db.Column(db.String(80), nullable=True)
-    estado = db.Column(db.String(20), default='pendiente')
-    numero_pedido = db.Column(db.Integer, nullable=True)
-    total = db.Column(db.Float, default=0.0)
-    fecha = db.Column(db.DateTime, default=datetime.now) # Guarda la fecha y hora de creación según el reloj local del servidor
-    forma_pago = db.Column(db.String(20), default='efectivo')
-    
-    # Nuevos campos para registro de pagos mixtos y transferencias
-    numero_comprobante = db.Column(db.String(50), nullable=True)
-    monto_efectivo = db.Column(db.Float, nullable=True)
+
+    # Plataforma de delivery externa, ej: "PedidosYa", "Rappi". Puede ser NULL si es local.
+    plataforma      = db.Column(db.String(80),  nullable=True)
+
+    # Estado del ciclo de vida del pedido en cocina.
+    # Flujo: pendiente -> en_proceso -> preparado -> entregado
+    estado          = db.Column(db.String(20), default='pendiente')
+
+    # Numero visual del ticket mostrado en cocina (del 1 al 50, ciclico).
+    numero_pedido   = db.Column(db.Integer, nullable=True)
+
+    total           = db.Column(db.Float, default=0.0)
+
+    # datetime.now (sin parentesis): SQLAlchemy llama a la funcion en el momento
+    # de insertar el registro, no al definir el modelo.
+    fecha           = db.Column(db.DateTime, default=datetime.now)
+
+    # Forma de pago: "efectivo", "transferencia", "mixto".
+    forma_pago      = db.Column(db.String(20), default='efectivo')
+
+    # Campos para pagos con transferencia o mixtos.
+    numero_comprobante  = db.Column(db.String(50), nullable=True)
+    monto_efectivo      = db.Column(db.Float, nullable=True)
     monto_transferencia = db.Column(db.Float, nullable=True)
 
-    # Relación uno-a-muchos: Un pedido puede tener muchos Detalles de Pedido.
-    # 'backref' crea virtualmente un atributo 'pedido' dentro del modelo DetallePedido para acceder de regreso.
+    # Relacion 1:N con DetallePedido. Un pedido tiene muchos detalles (items).
+    # backref='pedido' crea el atributo inverso detalle.pedido para navegar desde
+    # un DetallePedido hacia su Pedido padre.
     detalles = db.relationship('DetallePedido', backref='pedido', lazy=True)
 
+
 # ==========================================
-# TABLA: DETALLES DEL PEDIDO
+# TABLA: detalles_pedido
+# Cada fila representa un producto dentro de un pedido
 # ==========================================
 class DetallePedido(db.Model):
     __tablename__ = 'detalles_pedido'
 
     id = db.Column(db.Integer, primary_key=True)
-    # Llave foránea (ForeignKey): liga este detalle con la tabla pedidos a través de su 'id'
-    pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=False)
-    # Llave foránea: liga este detalle con la tabla productos
-    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
-    
-    cantidad = db.Column(db.Integer, nullable=False)
-    subtotal = db.Column(db.Float, nullable=False)
-    sabor = db.Column(db.String(120), nullable=True)
 
-    # Relación que permite acceder al objeto 'Producto' completo asociado a este detalle.
+    # Clave foranea (ForeignKey): vincula este detalle al pedido al que pertenece.
+    # Si se elimina el pedido padre, SQLAlchemy gestiona la integridad referencial.
+    pedido_id   = db.Column(db.Integer, db.ForeignKey('pedidos.id'),   nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
+
+    cantidad = db.Column(db.Integer, nullable=False)
+    subtotal = db.Column(db.Float,   nullable=False)
+
+    # Texto libre con el o los sabores elegidos por el cliente, ej: "Vainilla, Fresa".
+    sabor    = db.Column(db.String(120), nullable=True)
+
+    # Relacion hacia Producto para acceder al objeto completo desde un detalle.
+    # Ejemplo: detalle.producto.nombre
     producto = db.relationship('Producto')
 
 
 # ==========================================
-# TABLA: VENTAS
+# TABLA: ventas
+# Registro financiero de cada pedido cobrado
 # ==========================================
 class Venta(db.Model):
     __tablename__ = 'ventas'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id        = db.Column(db.Integer, primary_key=True)
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=False)
-    total = db.Column(db.Float, nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    total     = db.Column(db.Float, nullable=False)
+    fecha     = db.Column(db.DateTime, default=datetime.now)
     forma_pago = db.Column(db.String(20), default='efectivo')
 
-    # Guardar comprobante e importes del detalle del pago de la venta
-    numero_comprobante = db.Column(db.String(50), nullable=True)
-    monto_efectivo = db.Column(db.Float, nullable=True)
+    # Campos adicionales para auditar el desglose del pago.
+    numero_comprobante  = db.Column(db.String(50), nullable=True)
+    monto_efectivo      = db.Column(db.Float, nullable=True)
     monto_transferencia = db.Column(db.Float, nullable=True)
 
+    # Relacion hacia Pedido para acceder a los datos del cliente y tipo desde la venta.
     pedido = db.relationship('Pedido')
 
 
 # ==========================================
-# TABLA: CAJA
+# TABLA: caja
+# Registro del turno de cada jornada de trabajo
 # ==========================================
 class Caja(db.Model):
     __tablename__ = 'caja'
 
-    id = db.Column(db.Integer, primary_key=True)
+    id    = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.DateTime, default=datetime.now)
+
+    # Dinero con el que se abre la caja al inicio del turno.
     monto_inicial = db.Column(db.Float, nullable=False)
-    total_ingresos = db.Column(db.Float, default=0.0)
-    total_egresos = db.Column(db.Float, default=0.0)
-    monto_final = db.Column(db.Float, nullable=True)
-    estado = db.Column(db.String(20), default='abierta')
-    total_efectivo = db.Column(db.Float, default=0.0)
+
+    # Acumuladores que se incrementan con cada venta o egreso registrado.
+    total_ingresos     = db.Column(db.Float, default=0.0)
+    total_egresos      = db.Column(db.Float, default=0.0)
+    total_efectivo     = db.Column(db.Float, default=0.0)
     total_transferencia = db.Column(db.Float, default=0.0)
-    monto_declarado = db.Column(db.Float, nullable=True)  # Efectivo real contado por el cajero
-    descuadre = db.Column(db.Float, nullable=True)        # Faltante (-) o Soobrante (+)
+
+    # Calculado al cerrar: monto_inicial + total_ingresos - total_egresos.
+    monto_final = db.Column(db.Float, nullable=True)
+
+    # Estado del turno: "abierta" durante la jornada, "cerrada" al terminar.
+    estado = db.Column(db.String(20), default='abierta')
+
+    # Campos del Cierre de Caja Ciego (Blind Close):
+    # El cajero cuenta el dinero fisico y declara cuanto hay.
+    # El sistema compara con lo esperado y calcula la diferencia.
+    monto_declarado = db.Column(db.Float, nullable=True)  # Lo que el cajero dijo que habia
+    descuadre       = db.Column(db.Float, nullable=True)  # Diferencia: declarado - esperado
 
 
 # ==========================================
-# TABLA: EGRESOS
+# TABLA: egresos
+# Gastos realizados durante el turno (insumos, pagos, etc.)
 # ==========================================
 class Egreso(db.Model):
     __tablename__ = 'egresos'
 
-    id = db.Column(db.Integer, primary_key=True)
-    caja_id = db.Column(db.Integer, db.ForeignKey('caja.id'), nullable=False)
+    id          = db.Column(db.Integer, primary_key=True)
+    # Vincula el egreso a la caja abierta del dia.
+    caja_id     = db.Column(db.Integer, db.ForeignKey('caja.id'), nullable=False)
     descripcion = db.Column(db.String(200), nullable=False)
-    monto = db.Column(db.Float, nullable=False)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    monto       = db.Column(db.Float,       nullable=False)
+    fecha       = db.Column(db.DateTime,    default=datetime.now)
 
 
+# ==========================================
+# TABLA: configuracion_sistema
+# Parametros operativos en formato llave-valor
+# ==========================================
 class ConfiguracionSistema(db.Model):
     __tablename__ = 'configuracion_sistema'
 
-    # Tabla llave-valor para parametros operativos sin migrar esquema completo.
-    clave = db.Column(db.String(80), primary_key=True)
-    valor_entero = db.Column(db.Integer, nullable=True)
+    # Esta tabla usa un patron llave-valor (key-value store) simple.
+    # Permite guardar configuraciones sin necesidad de nuevas columnas o migraciones.
+    # Ejemplo de uso: clave='contador_ticket_diario', valor_entero=14
+    clave        = db.Column(db.String(80), primary_key=True)
+    valor_entero = db.Column(db.Integer,    nullable=True)

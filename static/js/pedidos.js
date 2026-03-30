@@ -1,46 +1,97 @@
-// Estado en memoria de la pantalla de pedidos; se sincroniza al confirmar/cargar.
+/**
+ * pedidos.js
+ * ----------
+ * Logica del modulo de toma de pedidos (punto de venta).
+ *
+ * Este es el archivo mas complejo del frontend. Gestiona:
+ * 1. El catalogo de productos con filtros y busqueda en tiempo real.
+ * 2. El carrito activo (pedidoActual) con sabores, cantidades y totales.
+ * 3. El flujo de checkout con validaciones por metodo de pago.
+ * 4. La impresion del ticket PDF.
+ * 5. Una cola de pedidos offline (para cuando no hay conexion a internet).
+ *
+ * Estado del modulo (variables globales):
+ * - pedidoActual: el carrito de compras activo en memoria.
+ * - productosCatalogo: lista completa del menu cargada desde el servidor.
+ * - categoriaActual: filtro de categoria activo en el catalogo.
+ * - itemPendienteSabor: guarda temporalmente el producto cuya seleccion de sabor esta abierta.
+ * - formaPagoActual: 'efectivo', 'transferencia' o 'mixto'.
+ * - siguienteNumeroPedido: numero visual del proximo ticket a generar.
+ * - tapTimers: Map que almacena los timers del detector de doble-tap.
+ */
+
+// ==========================================
+// ESTADO GLOBAL DEL MODULO
+// ==========================================
+
+// pedidoActual es el "carrito" en memoria. Se limpia despues de confirmar cada pedido.
 let pedidoActual = {
-    tipo: 'local',
-    productos: []
+    tipo: 'local',      // 'local' o 'delivery'.
+    productos: []       // Lista de items: { producto_id, nombre, precio, cantidad, sabor }.
 };
 
-let productosCatalogo = [];
-let categoriaActual = 'todas';
-let itemPendienteSabor = null;
-let formaPagoActual = 'efectivo';
-let siguienteNumeroPedido = 1;
-const tapTimers = new Map();
-const TAP_DELAY_MS = 260;
+let productosCatalogo     = [];           // Cache del catalogo de productos del servidor.
+let categoriaActual       = 'todas';      // Filtro de categoria activo.
+let itemPendienteSabor    = null;         // Producto que espera que el cajero seleccione su sabor.
+let formaPagoActual       = 'efectivo';   // Metodo de pago seleccionado en el checkout.
+let siguienteNumeroPedido = 1;           // Numero visual del proximo ticket.
 
-// Bootstrap inicial: catalogo, pedidos activos y numerador visual.
+// tapTimers: Map que guarda los temporizadores para detectar si un clic es simple o doble.
+// Map es una estructura clave-valor de JavaScript, similar a un diccionario en Python.
+const tapTimers   = new Map();
+const TAP_DELAY_MS = 260;   // Tiempo en ms para esperar y determinar si el tap es doble.
+
+
+// ==========================================
+// INICIALIZACION
+// ==========================================
+
 document.addEventListener('DOMContentLoaded', async () => {
+    // Conectamos el buscador del catalogo al filtro en tiempo real.
     document.getElementById('buscador-carta')?.addEventListener('input', aplicarFiltrosCatalogo);
 
+    // Cargamos en paralelo el catalogo, los pedidos activos y el numero del siguiente ticket.
     await Promise.all([
         cargarProductos(),
         cargarPedidosActivos(),
         cargarSiguienteNumeroPedido()
     ]);
 
+    // Refrescamos los pedidos activos cada 5 segundos de forma periodica.
+    // Esto sirve como respaldo en caso de que los WebSockets no esten disponibles.
     setInterval(cargarPedidosActivos, 5000);
+
+    // Establecemos los valores de UI por defecto.
     setFormaPago('efectivo');
     setTipo('local');
 });
 
+
+// ==========================================
+// CARGA DE DATOS
+// ==========================================
+
+/**
+ * Obtiene el numero del proximo ticket desde el servidor y lo muestra en la pantalla.
+ * Este numero se incrementa en el servidor cada vez que se crea un pedido.
+ */
 async function cargarSiguienteNumeroPedido() {
     try {
         const respuesta = await fetch('/pedidos/contador');
         if (!respuesta.ok) return;
 
-        const data = await respuesta.json();
-        siguienteNumeroPedido = Number(data.siguiente_numero || 1);
+        const data               = await respuesta.json();
+        siguienteNumeroPedido    = Number(data.siguiente_numero || 1);
         actualizarEtiquetaNumeroPedido();
     } catch (error) {
         console.error('No se pudo cargar contador de pedidos', error);
     }
 }
 
-// Refresca ambas etiquetas (pantalla principal y modal checkout).
+/**
+ * Actualiza todos los elementos del DOM que muestran el numero del proximo ticket.
+ * Hay dos lugares: la pantalla principal y el modal de checkout.
+ */
 function actualizarEtiquetaNumeroPedido() {
     const etiquetas = [
         document.getElementById('numero-pedido-actual'),
@@ -52,6 +103,9 @@ function actualizarEtiquetaNumeroPedido() {
     });
 }
 
+/**
+ * Descarga el catalogo de productos del servidor y actualiza la vista del menu.
+ */
 async function cargarProductos() {
     try {
         const respuesta = await fetch('/productos/');
@@ -68,23 +122,37 @@ async function cargarProductos() {
     }
 }
 
-// Renderiza filtros dinamicos por categoria segun catalogo recibido.
+
+// ==========================================
+// FILTROS DEL CATALOGO
+// ==========================================
+
+/**
+ * Construye dinamicamente los botones de filtro de categoria.
+ * Se usa Set para obtener categorias unicas del catalogo sin repetidos.
+ */
 function renderizarFiltros(productos) {
     const categorias = [...new Set(productos.map((p) => p.categoria))];
     const contenedor = document.getElementById('filtros');
     if (!contenedor) return;
 
+    // Eliminamos los filtros dinamicos anteriores para no acumular duplicados.
     contenedor.querySelectorAll('.dinamico').forEach((btn) => btn.remove());
 
     categorias.forEach((cat) => {
-        const btn = document.createElement('button');
+        const btn     = document.createElement('button');
         btn.className = 'btn btn-sm filtro-btn dinamico px-3 text-nowrap';
         btn.textContent = cat;
-        btn.onclick = (event) => filtrarCategoria(cat, event);
+        btn.onclick   = (event) => filtrarCategoria(cat, event);
         contenedor.appendChild(btn);
     });
 }
 
+/**
+ * Cambia la categoria activa y aplica los filtros al catalogo.
+ * @param {string} categoria - Nombre de la categoria seleccionada.
+ * @param {Event}  event     - Evento del clic para marcar el boton como activo.
+ */
 function filtrarCategoria(categoria, event) {
     categoriaActual = categoria;
     document.querySelectorAll('.filtro-btn').forEach((b) => {
@@ -99,15 +167,19 @@ function filtrarCategoria(categoria, event) {
     aplicarFiltrosCatalogo();
 }
 
+/**
+ * Filtra el catalogo en memoria segun la categoria activa y el texto del buscador.
+ * El filtrado es instantaneo porque se hace sobre los datos ya cargados, sin peticiones al servidor.
+ */
 function aplicarFiltrosCatalogo() {
     const texto = (document.getElementById('buscador-carta')?.value || '').trim().toLowerCase();
 
     const productos = productosCatalogo.filter((p) => {
         const coincideCategoria = categoriaActual === 'todas' || p.categoria === categoriaActual;
-        const sabores = (p.sabores || []).map((s) => s.nombre).join(' ').toLowerCase();
-        const coincideTexto =
+        const sabores           = (p.sabores || []).map((s) => s.nombre).join(' ').toLowerCase();
+        const coincideTexto     =
             !texto ||
-            p.nombre.toLowerCase().includes(texto) ||
+            p.nombre.toLowerCase().includes(texto)    ||
             p.categoria.toLowerCase().includes(texto) ||
             sabores.includes(texto);
 
@@ -117,7 +189,16 @@ function aplicarFiltrosCatalogo() {
     renderizarProductos(productos);
 }
 
-// Dibuja tarjetas de producto respetando disponibilidad y soporte de sabores.
+
+// ==========================================
+// RENDERIZADO DEL MENU
+// ==========================================
+
+/**
+ * Dibuja las tarjetas del catalogo de productos en la pantalla.
+ * Las tarjetas usan el detector de taps para distinguir entre tap simple y doble.
+ * Los productos no disponibles aparecen visualmente desactivados (clase CSS 'agotado').
+ */
 function renderizarProductos(productos) {
     const contenedor = document.getElementById('lista-productos');
     if (!contenedor) return;
@@ -139,8 +220,9 @@ function renderizarProductos(productos) {
         const tieneSabores = (p.sabores || []).length > 0;
         const img = p.imagen_url
             ? `<img src="${p.imagen_url}" alt="${p.nombre}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;">`
-            : '<div class="fs-3">🍦</div>';
+            : '<div class="fs-3">&#127846;</div>';
 
+        // Escapamos las comillas simples del nombre para evitar errores en el atributo onclick.
         const nombreSeguro = p.nombre.replace(/'/g, "\\'");
 
         col.innerHTML = `
@@ -158,17 +240,40 @@ function renderizarProductos(productos) {
     });
 }
 
+
+// ==========================================
+// DETECTOR DE TAP (SIMPLE Y DOBLE)
+// ==========================================
+
+/**
+ * Detecta si el usuario hizo un tap simple o doble sobre una tarjeta de producto.
+ * El tap simple abre el modal de seleccion de sabores (flujo normal).
+ * El double-tap agrega el producto directamente con los primeros sabores sugeridos (modo rapido).
+ *
+ * Funcionamiento del detector:
+ * 1. Al primer tap, se guarda un temporizador en tapTimers con setTimeout.
+ * 2. Si en menos de TAP_DELAY_MS llega un segundo tap, se cancela el temporizador
+ *    y se ejecuta el modo rapido.
+ * 3. Si no llega segundo tap, el temporizador se cumple y ejecuta el modo normal.
+ *
+ * @param {HTMLElement} cardElement - La tarjeta DOM que recibio el tap.
+ * @param {number}      id          - ID del producto.
+ * @param {string}      nombre      - Nombre del producto.
+ * @param {number}      precio      - Precio unitario del producto.
+ */
 function handleProductoTap(cardElement, id, nombre, precio) {
-    const key = `${id}`;
+    const key   = `${id}`;
     const timer = tapTimers.get(key);
 
     if (timer) {
+        // Ya habia un tap previo dentro del tiempo de espera: es un doble tap.
         clearTimeout(timer);
         tapTimers.delete(key);
         agregarRapido(id, nombre, precio, cardElement);
         return;
     }
 
+    // Primer tap: iniciamos el temporizador y esperamos un posible segundo tap.
     const newTimer = setTimeout(() => {
         tapTimers.delete(key);
         agregarProducto(id, nombre, precio, cardElement);
@@ -177,29 +282,58 @@ function handleProductoTap(cardElement, id, nombre, precio) {
     tapTimers.set(key, newTimer);
 }
 
-// Tap simple abre flujo normal; doble tap aplica agregado rapido.
+
+// ==========================================
+// AGREGAR PRODUCTOS AL CARRITO
+// ==========================================
+
+/**
+ * Flujo de tap simple: si el producto tiene sabores disponibles, abre el modal de seleccion.
+ * Si no tiene sabores, lo agrega directamente sin abrir el modal.
+ *
+ * @param {number}      id          - ID del producto.
+ * @param {string}      nombre      - Nombre del producto.
+ * @param {number}      precio      - Precio unitario.
+ * @param {HTMLElement} cardElement - Tarjeta DOM (para el feedback visual).
+ */
 function agregarProducto(id, nombre, precio, cardElement = null) {
-    const producto = productosCatalogo.find((p) => p.id === id);
-    const sabores = (producto?.sabores || []).map((s) => s.nombre);
+    const producto   = productosCatalogo.find((p) => p.id === id);
+    const sabores    = (producto?.sabores || []).map((s) => s.nombre);
     const maxSabores = Number(producto?.max_sabores || 1);
 
     if (sabores.length > 0) {
+        // El producto tiene sabores: abrimos el modal para que el cajero elija.
         itemPendienteSabor = { id, nombre, precio, sabores, maxSabores };
         abrirModalSabor(itemPendienteSabor);
         return;
     }
 
+    // Sin sabores: agrego directamente.
     agregarProductoConSabor(id, nombre, precio, null, cardElement);
 }
 
+/**
+ * Agrega un producto al carrito con un sabor especifico (o sin sabor).
+ * Si ya existe una linea con el mismo producto y sabor, incrementa la cantidad.
+ * Si no existe, crea una nueva linea en el pedidoActual.
+ *
+ * @param {number}      id          - ID del producto.
+ * @param {string}      nombre      - Nombre del producto.
+ * @param {number}      precio      - Precio base del producto.
+ * @param {string|null} sabor       - Sabores seleccionados como string, o null.
+ * @param {HTMLElement} cardElement - Tarjeta DOM (para el feedback visual).
+ */
 function agregarProductoConSabor(id, nombre, precio, sabor, cardElement = null) {
+    // Buscamos si ya hay una linea igual en el carrito (mismo producto Y mismo sabor).
     const mismaLinea = pedidoActual.productos.find(
         (p) => p.producto_id === id && (p.sabor || null) === (sabor || null)
     );
 
     if (mismaLinea) {
+        // Ya existe: sumamos uno a la cantidad.
         mismaLinea.cantidad++;
     } else {
+        // No existe: creamos una nueva linea en el carrito.
         pedidoActual.productos.push({ producto_id: id, nombre, precio, cantidad: 1, sabor });
     }
 
@@ -207,15 +341,27 @@ function agregarProductoConSabor(id, nombre, precio, sabor, cardElement = null) 
     feedbackAgregar(cardElement);
 }
 
-// En productos con sabores, toma sugeridos para acelerar carga en caja.
+/**
+ * Flujo de double-tap (modo rapido): agrega el producto sin abrir el modal.
+ * Si el producto tiene sabores, selecciona automaticamente los primeros N sugeridos
+ * donde N es el maximo de sabores permitidos por item.
+ * Util para cajeros experimentados que conocen el pedido.
+ *
+ * @param {number}      id          - ID del producto.
+ * @param {string}      nombre      - Nombre del producto.
+ * @param {number}      precio      - Precio base.
+ * @param {HTMLElement} cardElement - Tarjeta DOM para el feedback visual.
+ */
 function agregarRapido(id, nombre, precio, cardElement = null) {
-    const producto = productosCatalogo.find((p) => p.id === id);
+    const producto   = productosCatalogo.find((p) => p.id === id);
     if (!producto) return;
 
-    const sabores = (producto.sabores || []).map((s) => s.nombre);
+    const sabores    = (producto.sabores || []).map((s) => s.nombre);
     const maxSabores = Number(producto.max_sabores || 1);
 
     if (sabores.length > 0) {
+        // Tomamos los primeros maxSabores sabores de la lista como sugerencia automatica.
+        // slice(0, N) extrae los primeros N elementos de un array.
         const sugeridos = sabores.slice(0, Math.max(1, maxSabores));
         agregarProductoConSabor(id, nombre, precio, sugeridos.join(', '), cardElement);
         mostrarToast(`Agregado rapido: ${sugeridos.join(', ')}`, 'info');
@@ -225,6 +371,13 @@ function agregarRapido(id, nombre, precio, cardElement = null) {
     agregarProductoConSabor(id, nombre, precio, null, cardElement);
 }
 
+/**
+ * Aplica retroalimentacion visual y tactil al agregar un producto.
+ * - navigator.vibrate(20): vibracion de 20ms en dispositivos que lo soporten.
+ * - La clase CSS 'flash-add' dispara una animacion de destello en la tarjeta.
+ * - void cardElement.offsetWidth: fuerza al navegador a recalcular el layout,
+ *   lo que permite que la animacion se reinicie aunque ya este activa.
+ */
 function feedbackAgregar(cardElement) {
     if (navigator.vibrate) {
         navigator.vibrate(20);
@@ -232,14 +385,31 @@ function feedbackAgregar(cardElement) {
 
     if (cardElement) {
         cardElement.classList.remove('flash-add');
-        void cardElement.offsetWidth;
+        void cardElement.offsetWidth;  // Trick para reiniciar la animacion CSS.
         cardElement.classList.add('flash-add');
     }
 }
 
+
+// ==========================================
+// MODAL DE SELECCION DE SABORES
+// ==========================================
+
+/**
+ * Abre el modal de seleccion de sabores para el producto pendiente.
+ * Construye los controles segun el numero maximo de sabores permitidos:
+ * - max = 1: muestra botones de radio (solo uno seleccionable).
+ * - max > 1: muestra checkboxes (multiples seleccionables hasta el maximo).
+ *
+ * La funcion 'toggleSaborFeedback' se define dentro de este scope porque necesita
+ * acceder a 'itemPendienteSabor', que cambia con cada producto seleccionado.
+ * Se asigna a window para que el HTML inline (onchange="toggleSaborFeedback(this)") pueda accederla.
+ *
+ * @param {Object} item - { id, nombre, precio, sabores, maxSabores }
+ */
 function abrirModalSabor(item) {
-    const label = document.getElementById('sabor-producto-label');
-    const regla = document.getElementById('sabor-producto-regla');
+    const label    = document.getElementById('sabor-producto-label');
+    const regla    = document.getElementById('sabor-producto-regla');
     const selector = document.getElementById('selector-sabor-pedido');
 
     if (!label || !regla || !selector) return;
@@ -247,19 +417,26 @@ function abrirModalSabor(item) {
     label.textContent = `Selecciona sabor para ${item.nombre}`;
     regla.textContent = `Puedes elegir hasta ${item.maxSabores} sabor(es).`;
 
+    /**
+     * Callback que se ejecuta cuando el usuario selecciona o deselecciona un sabor.
+     * Para max = 1 (radio): confirma la seleccion automaticamente tras 150ms.
+     * Para max > 1 (checkboxes): desactiva los checkboxes no marcados cuando se alcanza el limite.
+     */
     window.toggleSaborFeedback = function(input) {
         if (navigator.vibrate) navigator.vibrate(15);
         if (itemPendienteSabor && itemPendienteSabor.maxSabores === 1) {
+            // Con radio buttons, confirmamos automaticamente tras un pequeno delay para mejor UX.
             setTimeout(confirmarSaborSeleccionado, 150);
         } else if (itemPendienteSabor) {
-            const checks = document.querySelectorAll('#selector-sabor-pedido input[type="checkbox"]');
+            // Con checkboxes, desactivamos los que no estan marcados si ya se alcanzo el limite.
+            const checks      = document.querySelectorAll('#selector-sabor-pedido input[type="checkbox"]');
             const checkedCount = Array.from(checks).filter(c => c.checked).length;
-            const max = itemPendienteSabor.maxSabores;
-            
+            const max         = itemPendienteSabor.maxSabores;
+
             checks.forEach(c => {
                 if (!c.checked) {
                     c.disabled = (checkedCount >= max);
-                    c.parentElement.style.opacity = c.disabled ? '0.4' : '1';
+                    c.parentElement.style.opacity      = c.disabled ? '0.4' : '1';
                     c.parentElement.style.pointerEvents = c.disabled ? 'none' : 'auto';
                 }
             });
@@ -267,6 +444,7 @@ function abrirModalSabor(item) {
     };
 
     if (item.maxSabores === 1) {
+        // Un solo sabor: radio buttons (mutuamente excluyentes).
         selector.innerHTML = item.sabores.map((s) => `
             <label class="sabor-opcion">
                 <input class="form-check-input" name="sabor-unico" type="radio" value="${s}" onchange="toggleSaborFeedback(this)">
@@ -274,16 +452,18 @@ function abrirModalSabor(item) {
             </label>
         `).join('');
     } else {
+        // Multiples sabores: checkboxes.
+        // Pre-seleccionamos automaticamente los primeros maxSabores para guiar al cajero.
         selector.innerHTML = item.sabores.map((s, index) => {
-            const isChecked = index < item.maxSabores;
-            const isDisabled = !isChecked; // Porque inicialmente seleccionamos el maximo permitido
+            const isChecked  = index < item.maxSabores;
+            const isDisabled = !isChecked;
             const pointerStyle = isDisabled ? 'pointer-events: none;' : '';
             const opacityStyle = isDisabled ? 'opacity: 0.4;' : '';
             return `
-            <label class="sabor-opcion" style="${pointerStyle} ${opacityStyle}">
-                <input class="form-check-input" type="checkbox" value="${s}" ${isChecked ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} onchange="toggleSaborFeedback(this)">
-                <span>${s}</span>
-            </label>
+                <label class="sabor-opcion" style="${pointerStyle} ${opacityStyle}">
+                    <input class="form-check-input" type="checkbox" value="${s}" ${isChecked ? 'checked' : ''} ${isDisabled ? 'disabled' : ''} onchange="toggleSaborFeedback(this)">
+                    <span>${s}</span>
+                </label>
             `;
         }).join('');
     }
@@ -291,11 +471,14 @@ function abrirModalSabor(item) {
     new bootstrap.Modal(document.getElementById('modal-sabor')).show();
 }
 
-// Aplica validaciones de seleccion antes de persistir sabor en el item.
+/**
+ * Valida la seleccion de sabores y agrega el producto al carrito.
+ * Se llama cuando el usuario presiona "Confirmar" en el modal de sabores.
+ */
 function confirmarSaborSeleccionado() {
     if (!itemPendienteSabor) return;
 
-    const checks = document.querySelectorAll('#selector-sabor-pedido input:checked');
+    const checks              = document.querySelectorAll('#selector-sabor-pedido input:checked');
     const saboresSeleccionados = [...checks].map((c) => c.value);
 
     if (saboresSeleccionados.length === 0) {
@@ -312,27 +495,35 @@ function confirmarSaborSeleccionado() {
         itemPendienteSabor.id,
         itemPendienteSabor.nombre,
         itemPendienteSabor.precio,
+        // Los sabores se almacenan como un string separado por comas.
         saboresSeleccionados.join(', ')
     );
 
+    // Cerramos el modal con optional chaining por si ya fue destruido.
     bootstrap.Modal.getInstance(document.getElementById('modal-sabor'))?.hide();
     itemPendienteSabor = null;
 }
 
+
+// ==========================================
+// RESUMEN DEL CARRITO
+// ==========================================
+
+/**
+ * Reconstruye y actualiza la vista del carrito activo (lista de items y total).
+ * Esta funcion se llama cada vez que se agrega, quita o edita un producto.
+ * Actualiza tanto la vista de escritorio como la de movil.
+ */
 function actualizarResumen() {
-    const contenedor = document.getElementById('items-pedido');
+    const contenedor       = document.getElementById('items-pedido');
     const contenedorMobile = document.getElementById('items-pedido-mobile-list');
-    
-    if (contenedor) contenedor.innerHTML = '';
+
+    if (contenedor)       contenedor.innerHTML = '';
     if (contenedorMobile) contenedorMobile.innerHTML = '';
 
     if (pedidoActual.productos.length === 0) {
-        if (contenedor) {
-            contenedor.innerHTML = '<p class="text-muted small" id="pedido-vacio">No hay productos aun</p>';
-        }
-        if (contenedorMobile) {
-            contenedorMobile.innerHTML = '<p class="text-muted small text-center my-4" id="pedido-vacio-mobile">No hay productos aun</p>';
-        }
+        if (contenedor)       contenedor.innerHTML = '<p class="text-muted small" id="pedido-vacio">No hay productos aun</p>';
+        if (contenedorMobile) contenedorMobile.innerHTML = '<p class="text-muted small text-center my-4" id="pedido-vacio-mobile">No hay productos aun</p>';
         document.getElementById('total-pedido').textContent = '$0.00';
         actualizarResumenMovil(0, 0);
         actualizarCheckoutTotal(0);
@@ -343,12 +534,15 @@ function actualizarResumen() {
     let items = 0;
 
     pedidoActual.productos.forEach((item) => {
+        // Los pedidos delivery tienen un recargo de $0.25 por producto.
         const precioUnitario = pedidoActual.tipo === 'delivery' ? item.precio + 0.25 : item.precio;
-        const subtotal = precioUnitario * item.cantidad;
-        total += subtotal;
-        items += item.cantidad;
+        const subtotal       = precioUnitario * item.cantidad;
+        total  += subtotal;
+        items  += item.cantidad;
 
+        // Escapamos las comillas simples del sabor para el atributo onclick.
         const saborSeguro = item.sabor ? item.sabor.replace(/'/g, "\\'") : null;
+
         const html = `
             <div>
                 <span class="fw-bold small">${item.nombre}</span>
@@ -357,7 +551,7 @@ function actualizarResumen() {
                 <small class="text-muted">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${pedidoActual.tipo === 'delivery' ? '<span class="text-warning" style="font-size: 0.65rem;">(+0.25)</span>' : ''}</small>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-color: #e5e7eb;" onclick="editarObservacion(${item.producto_id}, ${saborSeguro ? `'${saborSeguro}'` : 'null'})" title="Añadir Observación">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-color: #e5e7eb;" onclick="editarObservacion(${item.producto_id}, ${saborSeguro ? `'${saborSeguro}'` : 'null'})" title="Anadir Observacion">
                     <i class="bi bi-pencil text-muted"></i>
                 </button>
                 <span class="text-success fw-bold small">$${subtotal.toFixed(2)}</span>
@@ -366,18 +560,14 @@ function actualizarResumen() {
                 </button>
             </div>`;
 
-        if (contenedor) {
+        // Agregamos el mismo HTML en el contenedor de escritorio y el movil.
+        [contenedor, contenedorMobile].forEach((cont) => {
+            if (!cont) return;
             const div = document.createElement('div');
             div.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
             div.innerHTML = html;
-            contenedor.appendChild(div);
-        }
-        if (contenedorMobile) {
-            const divM = document.createElement('div');
-            divM.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
-            divM.innerHTML = html;
-            contenedorMobile.appendChild(divM);
-        }
+            cont.appendChild(div);
+        });
     });
 
     document.getElementById('total-pedido').textContent = `$${total.toFixed(2)}`;
@@ -385,25 +575,38 @@ function actualizarResumen() {
     actualizarResumenMovil(total, items);
 }
 
+/**
+ * Actualiza el total que se muestra en el modal de checkout y recalcula el cambio.
+ * @param {number} total - Monto total del pedido.
+ */
 function actualizarCheckoutTotal(total) {
     const target = document.getElementById('checkout-total');
     if (target) {
         target.textContent = `$${Number(total).toFixed(2)}`;
     }
+    // Si la funcion de cambio existe y el pago es efectivo, la disparamos.
     if (typeof calcularCambioEfectivo === 'function') {
         calcularCambioEfectivo();
     }
 }
 
-// Resume total/items en la barra inferior movil.
+/**
+ * Actualiza la barra flotante del resumen en la vista movil.
+ * Muestra el total y la cantidad de items en la parte inferior de la pantalla.
+ */
 function actualizarResumenMovil(total, items) {
     const totalMobile = document.getElementById('total-pedido-mobile');
     const itemsMobile = document.getElementById('items-pedido-mobile');
 
     if (totalMobile) totalMobile.textContent = `$${Number(total || 0).toFixed(2)}`;
+    // Pluralizacion simple: si hay exactamente 1 item, no usamos la 's' final.
     if (itemsMobile) itemsMobile.textContent = `${items} item${items === 1 ? '' : 's'}`;
 }
 
+/**
+ * Reduce la cantidad de un item en 1. Si llega a 0, lo elimina del carrito.
+ * La comparacion de sabor usa '|| null' para que null y undefined sean equivalentes.
+ */
 function quitarProducto(id, sabor = null) {
     if (navigator.vibrate) navigator.vibrate(15);
     const item = pedidoActual.productos.find(
@@ -415,6 +618,7 @@ function quitarProducto(id, sabor = null) {
     if (item.cantidad > 1) {
         item.cantidad--;
     } else {
+        // Eliminamos el item del array usando .filter() que retorna un nuevo array sin el elemento.
         pedidoActual.productos = pedidoActual.productos.filter(
             (p) => !(p.producto_id === id && (p.sabor || null) === (sabor || null))
         );
@@ -423,6 +627,11 @@ function quitarProducto(id, sabor = null) {
     actualizarResumen();
 }
 
+/**
+ * Permite agregar una nota u observacion libre a un item del carrito.
+ * Usa prompt() del navegador (cuadro de texto nativo) por simplicidad.
+ * Si el cajero cancela el prompt, no se hace ningun cambio.
+ */
 function editarObservacion(id, sabor = null) {
     if (navigator.vibrate) navigator.vibrate(15);
     const item = pedidoActual.productos.find(
@@ -431,14 +640,25 @@ function editarObservacion(id, sabor = null) {
 
     if (!item) return;
 
-    const nuevaNota = prompt(`Detalle / Observación para:\n${item.nombre}`, item.sabor || "");
-    
-    if (nuevaNota !== null) { 
+    const nuevaNota = prompt(`Detalle / Observacion para:\n${item.nombre}`, item.sabor || "");
+
+    // prompt() retorna null si el usuario presiona "Cancelar".
+    if (nuevaNota !== null) {
+        // Si la nota queda vacia, la eliminamos (null); si tiene contenido, la guardamos.
         item.sabor = nuevaNota.trim() !== "" ? nuevaNota.trim() : null;
         actualizarResumen();
     }
 }
 
+
+// ==========================================
+// CHECKOUT Y FORMULARIO DE PAGO
+// ==========================================
+
+/**
+ * Abre el modal de checkout con los totales actualizados.
+ * Valida primero que el carrito no este vacio.
+ */
 function abrirCheckout() {
     if (navigator.vibrate) navigator.vibrate(20);
     if (pedidoActual.productos.length === 0) {
@@ -447,38 +667,56 @@ function abrirCheckout() {
     }
 
     actualizarEtiquetaNumeroPedido();
-    const total = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+    // reduce() acumula el total calculando el precio con el recargo delivery si aplica.
+    const total = pedidoActual.productos.reduce(
+        (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
+    );
     actualizarCheckoutTotal(total);
     new bootstrap.Modal(document.getElementById('modal-checkout')).show();
 }
 
+/**
+ * Cambia el tipo de pedido (local/delivery) y recalcula los totales.
+ * El tipo de pedido afecta el precio: el delivery agrega $0.25 por item.
+ * Tambien actualiza el estilo visual de los botones de tipo.
+ */
 function setTipo(tipo) {
     if (navigator.vibrate) navigator.vibrate(10);
     pedidoActual.tipo = tipo;
 
     actualizarResumen();
-    const total = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+    const total = pedidoActual.productos.reduce(
+        (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
+    );
     actualizarCheckoutTotal(total);
 
-    const btnLocal = document.getElementById('btn-local');
+    // Actualizamos las clases de los botones para indicar cual esta activo.
+    const btnLocal    = document.getElementById('btn-local');
     const btnDelivery = document.getElementById('btn-delivery');
-    if (btnLocal) btnLocal.className = `btn btn-sm flex-fill ${tipo === 'local' ? 'btn-dark' : 'btn-outline-dark'}`;
+    if (btnLocal)    btnLocal.className    = `btn btn-sm flex-fill ${tipo === 'local'    ? 'btn-dark' : 'btn-outline-dark'}`;
     if (btnDelivery) btnDelivery.className = `btn btn-sm flex-fill ${tipo === 'delivery' ? 'btn-dark' : 'btn-outline-dark'}`;
 }
 
-// Controla visibilidad de campos extra segun forma de pago elegida.
+/**
+ * Cambia el metodo de pago activo y muestra/oculta los campos correspondientes.
+ * - efectivo: muestra el campo de monto recibido y calculo de cambio.
+ * - transferencia: muestra el campo de numero de comprobante.
+ * - mixto: muestra ambos (comprobante + montos parciales).
+ */
 function setFormaPago(forma) {
     if (navigator.vibrate) navigator.vibrate(10);
     formaPagoActual = forma;
+
+    // Actualizamos el estilo de los 3 botones de forma de pago.
     ['efectivo', 'transferencia', 'mixto'].forEach((f) => {
         const btn = document.getElementById(`btn-${f}`);
         if (btn) btn.className = `btn btn-sm flex-fill ${f === forma ? 'btn-dark' : 'btn-outline-dark'}`;
     });
 
-    const contenedorExtra = document.getElementById('campos-pago-extra');
-    const compComprobante = document.getElementById('campo-comprobante');
-    const compMixto = document.getElementById('campos-mixto');
-    const compEfectivo = document.getElementById('campos-efectivo');
+    const contenedorExtra  = document.getElementById('campos-pago-extra');
+    const compComprobante  = document.getElementById('campo-comprobante');
+    const compMixto        = document.getElementById('campos-mixto');
+    const compEfectivo     = document.getElementById('campos-efectivo');
 
     if (!contenedorExtra || !compComprobante || !compMixto) return;
 
@@ -486,31 +724,41 @@ function setFormaPago(forma) {
 
     if (forma === 'efectivo') {
         compComprobante.style.display = 'none';
-        compMixto.style.display = 'none';
+        compMixto.style.display       = 'none';
         if (compEfectivo) compEfectivo.style.display = 'flex';
         calcularCambioEfectivo();
     } else if (forma === 'transferencia') {
         compComprobante.style.display = 'block';
-        compMixto.style.display = 'none';
+        compMixto.style.display       = 'none';
         if (compEfectivo) compEfectivo.style.display = 'none';
     } else {
+        // Mixto: efectivo + transferencia.
         compComprobante.style.display = 'block';
-        compMixto.style.display = 'flex';
+        compMixto.style.display       = 'flex';
         if (compEfectivo) compEfectivo.style.display = 'none';
     }
 }
 
-// Calcula el cambio matematico en tiempo real p/ pagos en efectivo
+/**
+ * Calcula y muestra el vuelto en tiempo real cuando el cajero ingresa el monto recibido.
+ * Solo se ejecuta si el metodo de pago es efectivo.
+ * Muestra "Faltan $X.XX" si el monto recibido es insuficiente.
+ */
 function calcularCambioEfectivo() {
     if (formaPagoActual !== 'efectivo') return;
-    
-    const subtotalBruto = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+
+    // Calculamos el total con el posible recargo delivery.
+    const subtotalBruto = pedidoActual.productos.reduce(
+        (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
+    );
+
     const inputRecibido = document.getElementById('monto-recibido');
-    const recibido = parseFloat(inputRecibido?.value) || 0;
-    const cambioInput = document.getElementById('monto-cambio');
-    
+    const recibido      = parseFloat(inputRecibido?.value) || 0;
+    const cambioInput   = document.getElementById('monto-cambio');
+
     if (!cambioInput) return;
 
+    // Si el campo esta vacio, limpiamos el cambio.
     if (recibido === 0 || inputRecibido.value === '') {
         cambioInput.value = '';
         cambioInput.classList.replace('text-danger', 'text-success');
@@ -522,16 +770,21 @@ function calcularCambioEfectivo() {
         cambioInput.value = cambio.toFixed(2);
         cambioInput.classList.replace('text-danger', 'text-success');
     } else {
+        // Math.abs() calcula el valor absoluto (elimina el signo negativo).
         cambioInput.value = 'Faltan $' + Math.abs(cambio).toFixed(2);
         cambioInput.classList.replace('text-success', 'text-danger');
     }
 }
 
+/**
+ * Reinicia todos los campos del formulario de pedido para la siguiente venta.
+ * Se llama automaticamente despues de confirmar un pedido exitosamente.
+ */
 function limpiarPedido() {
     pedidoActual.productos = [];
-    document.getElementById('cliente-nombre').value = 'Consumidor final';
-    document.getElementById('numero-comprobante').value = '';
-    document.getElementById('monto-efectivo').value = '';
+    document.getElementById('cliente-nombre').value      = 'Consumidor final';
+    document.getElementById('numero-comprobante').value  = '';
+    document.getElementById('monto-efectivo').value      = '';
     document.getElementById('monto-transferencia').value = '';
     const mr = document.getElementById('monto-recibido');
     if (mr) mr.value = '';
@@ -544,7 +797,10 @@ function limpiarPedido() {
     actualizarResumen();
 }
 
-// Evita doble envio mientras se confirma el pedido.
+/**
+ * Activa/desactiva el estado de carga del boton de confirmar para evitar doble envio.
+ * Guarda el HTML original en un atributo data-* para poder restaurarlo despues.
+ */
 function setConfirmandoPedido(loading) {
     const boton = document.getElementById('btn-confirmar-final');
     if (!boton) return;
@@ -559,6 +815,25 @@ function setConfirmandoPedido(loading) {
     }
 }
 
+
+// ==========================================
+// CONFIRMACION DEL PEDIDO
+// ==========================================
+
+/**
+ * Valida todos los campos del checkout y envia el pedido al servidor.
+ * Si no hay conexion a internet, guarda el pedido en la cola offline.
+ *
+ * Validaciones que realiza ANTES de enviar:
+ * 1. El nombre del cliente no puede estar vacio.
+ * 2. El carrito debe tener al menos un producto.
+ * 3. Las transferencias requieren numero de comprobante.
+ * 4. En efectivo, el monto recibido no puede ser menor al total.
+ * 5. En pagos mixtos, la suma de montos debe ser igual al total.
+ *
+ * El bloque try/catch/finally garantiza que el boton siempre se reactive
+ * incluso si hay un error inesperado en el proceso.
+ */
 async function confirmarPedido() {
     const nombre = document.getElementById('cliente-nombre').value.trim();
 
@@ -572,7 +847,7 @@ async function confirmarPedido() {
     }
 
     const numComprobante = document.getElementById('numero-comprobante').value.trim();
-    const mEfectivo = parseFloat(document.getElementById('monto-efectivo').value) || 0;
+    const mEfectivo      = parseFloat(document.getElementById('monto-efectivo').value) || 0;
     const mTransferencia = parseFloat(document.getElementById('monto-transferencia').value) || 0;
 
     if (formaPagoActual === 'transferencia' && !numComprobante) {
@@ -582,7 +857,9 @@ async function confirmarPedido() {
 
     if (formaPagoActual === 'efectivo') {
         const recibido = parseFloat(document.getElementById('monto-recibido')?.value) || 0;
-        const totalReq = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+        const totalReq = pedidoActual.productos.reduce(
+            (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
+        );
         if (recibido > 0 && recibido < totalReq) {
             mostrarToast(`Faltan $${(totalReq - recibido).toFixed(2)} para completar el pago`, 'warning');
             return;
@@ -595,7 +872,10 @@ async function confirmarPedido() {
             return;
         }
 
-        const totalVal = pedidoActual.productos.reduce((acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0);
+        const totalVal = pedidoActual.productos.reduce(
+            (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
+        );
+        // Usamos margen de 0.01 para tolerar errores de redondeo en numeros decimales.
         if (Math.abs((mEfectivo + mTransferencia) - totalVal) > 0.01) {
             document.getElementById('validacion-montos').style.display = 'block';
             mostrarToast('Los montos no suman el total del pedido', 'warning');
@@ -606,28 +886,30 @@ async function confirmarPedido() {
 
     setConfirmandoPedido(true);
 
-    // Payload esperado por /pedidos/ conservando compatibilidad de sabores.
+    // Construimos el objeto JSON que esperan los endpoints de pedidos.
     const datos = {
-        tipo: pedidoActual.tipo,
-        cliente_nombre: nombre || 'Consumidor final',
+        tipo:            pedidoActual.tipo,
+        cliente_nombre:  nombre || 'Consumidor final',
         cliente_telefono: null,
         cliente_direccion: null,
-        plataforma: null,
-        forma_pago: formaPagoActual,
+        plataforma:      null,
+        forma_pago:      formaPagoActual,
         numero_comprobante: ['transferencia', 'mixto'].includes(formaPagoActual) ? numComprobante : null,
-        monto_efectivo: formaPagoActual === 'mixto' ? mEfectivo : null,
+        monto_efectivo:    formaPagoActual === 'mixto' ? mEfectivo : null,
         monto_transferencia: formaPagoActual === 'mixto' ? mTransferencia : null,
         productos: pedidoActual.productos.map((p) => ({
             producto_id: p.producto_id,
-            cantidad: p.cantidad,
-            sabor: p.sabor || null,
-            sabores: p.sabor ? p.sabor.split(',').map((s) => s.trim()).filter(Boolean) : []
+            cantidad:    p.cantidad,
+            sabor:       p.sabor || null,
+            // Convertimos el string "Vainilla, Chocolate" al array ["Vainilla", "Chocolate"].
+            sabores:     p.sabor ? p.sabor.split(',').map((s) => s.trim()).filter(Boolean) : []
         }))
     };
 
+    // Si no hay conexion a internet, guardamos el pedido en localStorage para enviarlo despues.
     if (!navigator.onLine) {
         guardarPedidoOffline(datos);
-        mostrarToast('Sin conexión: Pedido guardado localmente (se enviará al reconectar).', 'warning');
+        mostrarToast('Sin conexion: Pedido guardado localmente (se enviara al reconectar).', 'warning');
         bootstrap.Modal.getInstance(document.getElementById('modal-checkout'))?.hide();
         limpiarPedido();
         siguienteNumeroPedido++;
@@ -638,9 +920,9 @@ async function confirmarPedido() {
 
     try {
         const respuesta = await fetch('/pedidos/', {
-            method: 'POST',
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(datos)
+            body:    JSON.stringify(datos)
         });
 
         const resultado = await respuesta.json();
@@ -655,7 +937,7 @@ async function confirmarPedido() {
         }
     } catch (error) {
         console.error(error);
-        // Si el fetch falla por timeout o servidor caído, encolamos el pedido
+        // Si el servidor no responde, encolamos el pedido offline.
         guardarPedidoOffline(datos);
         mostrarToast('Error en el servidor. Pedido guardado local de forma segura.', 'danger');
         bootstrap.Modal.getInstance(document.getElementById('modal-checkout'))?.hide();
@@ -663,51 +945,92 @@ async function confirmarPedido() {
         siguienteNumeroPedido++;
         actualizarEtiquetaNumeroPedido();
     } finally {
+        // finally siempre se ejecuta, exista error o no, garantizando que el boton se reactive.
         setConfirmandoPedido(false);
     }
 }
 
-// --- LOGICA OFFLINE (PWA QUEUE) ---
+
+// ==========================================
+// COLA OFFLINE (MODO SIN CONEXION)
+// ==========================================
+/**
+ * Este sistema guarda pedidos en localStorage cuando no hay conexion al servidor.
+ * localStorage es un almacenamiento clave-valor del navegador que persiste entre sesiones.
+ * JSON.stringify() convierte el objeto a string para guardarlo. JSON.parse() lo convierte de vuelta.
+ *
+ * Cuando la conexion se recupera, sincronizarPedidosOffline() los envia uno por uno al servidor.
+ */
+
+/**
+ * Agrega un pedido a la cola local de pedidos offline.
+ * Se le asigna un ID unico basado en el timestamp y un string aleatorio
+ * para evitar colisiones si se guardan multiples pedidos sin conexion.
+ */
 function guardarPedidoOffline(pedidoData) {
     let cola = JSON.parse(localStorage.getItem('cola_pedidos') || '[]');
+    // Generamos un ID unico combinando el timestamp actual y un string aleatorio.
     pedidoData._offline_id = Date.now().toString() + Math.random().toString(36).substring(2, 7);
     cola.push(pedidoData);
     localStorage.setItem('cola_pedidos', JSON.stringify(cola));
 }
 
+/**
+ * Intenta enviar el primer pedido de la cola offline al servidor.
+ * Si tiene exito, lo elimina de la cola y espera 1 segundo para enviar el siguiente.
+ * Si falla, restaura el _offline_id para que pueda reintentarse despues.
+ */
 function sincronizarPedidosOffline() {
     if (!navigator.onLine) return;
+
     let cola = JSON.parse(localStorage.getItem('cola_pedidos') || '[]');
     if (cola.length === 0) return;
 
-    const pedido = cola[0];
+    const pedido    = cola[0];
     const offlineId = pedido._offline_id;
+    // Eliminamos el campo interno antes de enviar al servidor (no es parte del contrato de la API).
     delete pedido._offline_id;
 
     fetch('/pedidos/', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(pedido)
+        body:    JSON.stringify(pedido)
     }).then(response => {
         if (response.ok) {
-            cola.shift(); // Quitar de la cola
+            // Exito: eliminamos el primer elemento de la cola y guardamos.
+            cola.shift();  // shift() remueve y retorna el primer elemento del array.
             localStorage.setItem('cola_pedidos', JSON.stringify(cola));
             mostrarToast('Pedido Offline enviado exitosamente.', 'success');
+            // Esperamos 1 segundo y procesamos el siguiente pedido de la cola.
             setTimeout(sincronizarPedidosOffline, 1000);
             cargarPedidosActivos();
             cargarSiguienteNumeroPedido();
         } else {
-            pedido._offline_id = offlineId; // Restaurar si hubo un error HTTP (ej: 400 Bad Request)
+            // Error HTTP (ej: 400): restauramos el ID para poder reintentarlo.
+            pedido._offline_id = offlineId;
         }
     }).catch(err => {
-        pedido._offline_id = offlineId; // Restaurar si fallo la red durante fetch
+        // Error de red: restauramos el ID.
+        pedido._offline_id = offlineId;
     });
 }
+
+// Sincronizamos cuando el dispositivo recupera la conexion.
 window.addEventListener('online', sincronizarPedidosOffline);
+// Tambien lo intentamos periodicamente cada 15 segundos.
 setInterval(sincronizarPedidosOffline, 15000);
+// Y al cargar la pagina, por si habia pedidos pendientes de la sesion anterior.
 document.addEventListener('DOMContentLoaded', sincronizarPedidosOffline);
 
 
+// ==========================================
+// HISTORIAL DE PEDIDOS ACTIVOS
+// ==========================================
+
+/**
+ * Descarga y renderiza los pedidos activos (no entregados aun) en la seccion lateral.
+ * Esta lista se actualiza automaticamente cada 5 segundos via setInterval.
+ */
 async function cargarPedidosActivos() {
     try {
         const respuesta = await fetch('/pedidos/');
@@ -722,12 +1045,19 @@ async function cargarPedidosActivos() {
     }
 }
 
-// Render compartido para escritorio y movil.
+/**
+ * Construye el HTML de la lista de pedidos activos y lo inserta en el DOM.
+ * La lista se renderiza tanto en la vista de escritorio como en la de movil.
+ * Muestra el estado actual de cada pedido con badges de color diferente.
+ *
+ * @param {Array} pedidos - Lista de pedidos activos retornada por el servidor.
+ */
 function renderizarPedidosActivos(pedidos) {
+    // Obtenemos todos los contenedores validos (escritorio y movil).
     const contenedores = [
         document.getElementById('lista-pedidos-activos'),
         document.getElementById('lista-pedidos-activos-mobile')
-    ].filter(Boolean);
+    ].filter(Boolean);  // filter(Boolean) elimina los null/undefined si alguno no existe.
 
     if (!contenedores.length) return;
 
@@ -745,18 +1075,15 @@ function renderizarPedidosActivos(pedidos) {
     }
 
     const html = pedidos.map((p) => {
+        // Generamos los badges segun el tipo, estado y forma de pago de cada pedido.
         const badgeTipo = p.tipo === 'delivery'
             ? '<span class="badge bg-warning text-dark">Delivery</span>'
             : '<span class="badge bg-info text-dark">Local</span>';
 
         let badgeEstado = '';
-        if (p.estado === 'pendiente') {
-            badgeEstado = '<span class="badge bg-secondary">Pendiente</span>';
-        } else if (p.estado === 'en_proceso') {
-            badgeEstado = '<span class="badge bg-primary">En Cocina</span>';
-        } else if (p.estado === 'preparado') {
-            badgeEstado = '<span class="badge bg-success">Listo p/ Entregar</span>';
-        }
+        if (p.estado === 'pendiente')  badgeEstado = '<span class="badge bg-secondary">Pendiente</span>';
+        else if (p.estado === 'en_proceso') badgeEstado = '<span class="badge bg-primary">En Cocina</span>';
+        else if (p.estado === 'preparado')  badgeEstado = '<span class="badge bg-success">Listo p/ Entregar</span>';
 
         const badgePago = p.forma_pago === 'transferencia'
             ? `<span class="badge bg-light text-dark border">Transf. #${p.numero_comprobante || '—'}</span>`
@@ -766,6 +1093,7 @@ function renderizarPedidosActivos(pedidos) {
                     ? `<span class="badge bg-light text-dark border">Pago PedidosYa</span>`
                 : '';
 
+        // Informacion de plataforma solo para pedidos delivery.
         const plataformaTxt = p.tipo === 'delivery' && p.plataforma
             ? `<div class="small text-muted">Plataforma: ${p.plataforma}</div>`
             : '';
@@ -793,7 +1121,7 @@ function renderizarPedidosActivos(pedidos) {
                         <button class="btn btn-sm btn-outline-danger" onclick="eliminarPedido(${p.id})">
                             <i class="bi bi-trash"></i> Eliminar
                         </button>
-                        ${p.estado === 'preparado' 
+                        ${p.estado === 'preparado'
                             ? `<button class="btn btn-sm btn-success" onclick="cambiarEstado(${p.id}, 'entregado')">
                                  <i class="bi bi-check-lg"></i> Entregar al Cliente
                                </button>`
@@ -806,15 +1134,25 @@ function renderizarPedidosActivos(pedidos) {
             </div>`;
     }).join('');
 
+    // Actualizamos todos los contenedores con el mismo HTML.
     contenedores.forEach((contenedor) => {
         contenedor.innerHTML = html;
     });
 }
 
+/**
+ * Abre el ticket PDF del pedido en una nueva pestana del navegador para imprimir.
+ * @param {number} pedidoId - ID del pedido cuyo ticket se va a imprimir.
+ */
 function imprimirTicketPedido(pedidoId) {
     window.open(`/pedidos/${pedidoId}/ticket`, '_blank');
 }
 
+/**
+ * Cancela y elimina un pedido de la cola activa.
+ * Pide confirmacion antes de enviar la solicitud de eliminacion.
+ * Si el servidor devuelve exito, recarga la lista de pedidos activos.
+ */
 async function eliminarPedido(pedidoId) {
     const confirmar = confirm('Este pedido se eliminara de la cola. Deseas continuar?');
     if (!confirmar) return;
@@ -823,6 +1161,7 @@ async function eliminarPedido(pedidoId) {
         const respuesta = await fetch(`/pedidos/${pedidoId}`, { method: 'DELETE' });
 
         let datos = {};
+        // Verificamos que la respuesta sea JSON antes de parsear.
         const contentType = respuesta.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
             datos = await respuesta.json();
@@ -839,6 +1178,10 @@ async function eliminarPedido(pedidoId) {
     }
 }
 
+/**
+ * Actualiza el estado de un pedido a 'entregado' cuando el cajero lo entrega al cliente.
+ * Pide confirmacion antes de marcar como entregado.
+ */
 async function cambiarEstado(pedidoId, nuevoEstado) {
     if (nuevoEstado === 'entregado') {
         const confirmar = confirm('Confirmas que este pedido fue entregado al cliente?');
@@ -847,9 +1190,9 @@ async function cambiarEstado(pedidoId, nuevoEstado) {
 
     try {
         const respuesta = await fetch(`/pedidos/${pedidoId}/estado`, {
-            method: 'PUT',
+            method:  'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ estado: nuevoEstado })
+            body:    JSON.stringify({ estado: nuevoEstado })
         });
 
         const datos = await respuesta.json();

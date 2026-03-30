@@ -1,5 +1,22 @@
+"""
+extensions.py
+-------------
+Este archivo existe para resolver un problema clasico en proyectos Flask medianos
+y grandes llamado "importacion circular" (circular import).
+
+El problema ocurre cuando dos modulos se importan mutuamente:
+    - app.py importa 'socketio' de extensions.py
+    - routes/pedidos.py importa 'socketio' de extensions.py
+    - Si socketio estuviera definido en app.py, pedidos.py tendria que importar app.py
+      y app.py a su vez importaria pedidos.py -> bucle infinito de importaciones.
+
+La solucion: crear una instancia de SocketIO aqui, sin ligarlo a una app todavia.
+Luego, en app.py, se hace socketio.init_app(app) para conectar ambos.
+"""
+
 from flask_socketio import SocketIO
 
-# Motor de comunicación bidireccional en tiempo real para el sistema KDS de cocina.
-# Configurado para permitir CORS desde cualquier origen (útil en Railway / local).
+# Se crea la instancia de SocketIO sin pasar la app de Flask todavia.
+# cors_allowed_origins="*" significa que cualquier dominio puede conectarse
+# via WebSocket. En produccion mas estricta se limitaria a un dominio especifico.
 socketio = SocketIO(cors_allowed_origins="*")
