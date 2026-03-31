@@ -2,7 +2,7 @@ import json
 import os
 
 # 1. PEGA AQUÍ TU URL DE NEON (Asegúrate de que empiece con postgresql://)
-os.environ['DATABASE_URL'] = "postgresql://helarte_db_user:ifXB5yfbM6Hb6hsmhZgmghtPK0Jlbf4O@dpg-d75tctu3jp1c73djrfi0-a/helarte_db"
+os.environ['DATABASE_URL'] = "postgresql://helarte_db_user:ifXB5yfbM6Hb6hsmhZgmghtPK0Jlbf4O@dpg-d75tctu3jp1c73djrfi0-a.oregon-postgres.render.com/helarte_db"
 
 from app import app
 from models.models import db, Producto
