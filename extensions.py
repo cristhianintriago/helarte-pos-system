@@ -32,3 +32,5 @@ def get_database_uri():
         # Esto cambia postgres:// por postgresql:// automáticamente
         uri = uri.replace("postgres://", "postgresql://", 1)
     return uri
+    
+#SE AÑADE ESTO EN EXTENSIONS.PY
