@@ -62,17 +62,6 @@ from sqlalchemy import inspect, text
 # ==========================================
 # CONFIGURACION CENTRAL DE LA APLICACION
 # ==========================================
-
-# Configuramos los parametros de la aplicacion.
-app.config['SQLALCHEMY_DATABASE_URI']        = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# --- AGREGA ESTAS LÍNEAS ---
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 300,
-}
-#se agregan estas lineas para que la base de datos no se desconecte
 # ---------------------------
 
 # Flask(__name__) crea la instancia de la aplicacion.
