@@ -63,6 +63,17 @@ from sqlalchemy import inspect, text
 # CONFIGURACION CENTRAL DE LA APLICACION
 # ==========================================
 
+# Configuramos los parametros de la aplicacion.
+app.config['SQLALCHEMY_DATABASE_URI']        = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# --- AGREGA ESTAS LÍNEAS ---
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
+# ---------------------------
+
 # Flask(__name__) crea la instancia de la aplicacion.
 # __name__ es una variable de Python que contiene el nombre del modulo actual ('app').
 # Flask lo usa para localizar los archivos de plantillas y archivos estaticos.
