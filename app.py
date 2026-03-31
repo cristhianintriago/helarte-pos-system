@@ -72,6 +72,7 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_pre_ping": True,
     "pool_recycle": 300,
 }
+#se agregan estas lineas para que la base de datos no se desconecte
 # ---------------------------
 
 # Flask(__name__) crea la instancia de la aplicacion.
