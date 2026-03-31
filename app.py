@@ -14,7 +14,21 @@ Estructura de la aplicacion:
 - Flask-Bcrypt: provee el algoritmo de hash seguro para contrasenas.
 - Flask-Limiter: limita la cantidad de solicitudes por IP (proteccion contra bots).
 - Flask-SocketIO: habilita comunicacion WebSocket en tiempo real (para la cocina).
+
+Por que eventlet.monkey_patch() va PRIMERO:
+Eventlet es una libreria de concurrencia que usa green threads (hilos cooperativos).
+Monkey-patching reemplaza las funciones de red y E/S de la libreria estandar de Python
+(socket, threading, time) por versiones compatibles con green threads.
+Si no se hace al inicio (antes de cualquier otro import), modulos como threading
+o psycopg2 ya habran importado las funciones originales y el patch no tendra efecto,
+causando bloqueos y errores de Lock en produccion con PostgreSQL.
 """
+
+# CRITICO: el monkey_patch debe ser la PRIMERA instruccion del archivo.
+# Cualquier import antes de esta linea puede causar bugs de concurrencia
+# en produccion con Gunicorn + Eventlet + PostgreSQL.
+import eventlet
+eventlet.monkey_patch()
 
 import os
 
@@ -57,30 +71,12 @@ from flask_bcrypt import Bcrypt
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sqlalchemy import inspect, text
+from sqlalchemy.pool import NullPool
 
 
 # ==========================================
 # CONFIGURACION CENTRAL DE LA APLICACION
 # ==========================================
-
-app = Flask(__name__)
-
-# 1. PRIMERO DEFINIMOS LA VARIABLE (Esta fue la línea que se borró)
-database_url = os.environ.get('DATABASE_URL', 'sqlite:///helarte.db')
-
-if database_url and database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
-
-# 2. LUEGO LA USAMOS
-app.config['SQLALCHEMY_DATABASE_URI']        = database_url
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# 3. Y MANTENEMOS LA PROTECCIÓN CONTRA DESCONEXIONES
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    "pool_pre_ping": True,
-    "pool_recycle": 300,
-}
-# ---------------------------
 
 # Flask(__name__) crea la instancia de la aplicacion.
 # __name__ es una variable de Python que contiene el nombre del modulo actual ('app').
@@ -94,12 +90,21 @@ database_url = os.environ.get('DATABASE_URL', 'sqlite:///helarte.db')
 
 # Railway cambia el prefijo 'postgres://' a 'postgresql://' en versiones antiguas.
 # SQLAlchemy 2.0 requiere el prefijo largo, por lo que lo corregimos si es necesario.
-if database_url.startswith('postgres://'):
+if database_url and database_url.startswith('postgres://'):
     database_url = database_url.replace('postgres://', 'postgresql://', 1)
 
 # Configuramos los parametros de la aplicacion.
 app.config['SQLALCHEMY_DATABASE_URI']        = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Evitamos advertencias innecesarias de SQLAlchemy.
+
+# NullPool: desactiva el pool de conexiones de SQLAlchemy.
+# Cuando Eventlet usa green threads, el mecanismo de locking del pool de SQLAlchemy
+# entra en conflicto con los locks de Eventlet, causando deadlocks en produccion.
+# NullPool abre y cierra una conexion nueva por cada solicitud, lo cual es seguro
+# con Eventlet y tiene un impacto minimo en rendimiento con PostgreSQL en Railway.
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'poolclass': NullPool
+}
 
 # La clave secreta se usa para firmar las cookies de sesion criptograficamente.
 # Si alguien intenta modificar una cookie, Flask la detecta y la invalida.
