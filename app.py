@@ -62,6 +62,24 @@ from sqlalchemy import inspect, text
 # ==========================================
 # CONFIGURACION CENTRAL DE LA APLICACION
 # ==========================================
+
+app = Flask(__name__)
+
+# 1. PRIMERO DEFINIMOS LA VARIABLE (Esta fue la línea que se borró)
+database_url = os.environ.get('DATABASE_URL', 'sqlite:///helarte.db')
+
+if database_url and database_url.startswith('postgres://'):
+    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+
+# 2. LUEGO LA USAMOS
+app.config['SQLALCHEMY_DATABASE_URI']        = database_url
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# 3. Y MANTENEMOS LA PROTECCIÓN CONTRA DESCONEXIONES
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_recycle": 300,
+}
 # ---------------------------
 
 # Flask(__name__) crea la instancia de la aplicacion.
