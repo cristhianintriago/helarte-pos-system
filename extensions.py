@@ -20,3 +20,15 @@ from flask_socketio import SocketIO
 # cors_allowed_origins="*" significa que cualquier dominio puede conectarse
 # via WebSocket. En produccion mas estricta se limitaria a un dominio especifico.
 socketio = SocketIO(cors_allowed_origins="*")
+
+import os
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+
+def get_database_uri():
+    uri = os.getenv("DATABASE_URL")
+    if uri and uri.startswith("postgres://"):
+        # Esto cambia postgres:// por postgresql:// automáticamente
+        uri = uri.replace("postgres://", "postgresql://", 1)
+    return uri
