@@ -322,11 +322,43 @@ function exportarExcel() {
 }
 
 /**
- * Descarga el PDF del reporte del dia actual en una nueva pestana.
+ * Descarga el corte de reporte PDF del dia actual.
+ * Primero verifica que haya caja disponible antes de abrir la ventana.
  */
-function descargarPDFHoy() {
-    window.open('/reporte-diario/pdf', '_blank');
-    mostrarToast('Generando reporte PDF...', 'info');
+async function descargarPDFHoy() {
+    // Cambiamos el boton para indicar que se esta procesando
+    let btn = document.querySelector('[onclick="descargarPDFHoy()"]');
+    let textoOriginal = '';
+    if (btn) {
+        textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generando...';
+        btn.disabled = true;
+    }
+
+    try {
+        // Verificamos rapidamente si hay caja antes de abrir el PDF
+        let respuesta = await fetch('/caja/estado');
+        let datos = await respuesta.json();
+
+        if (datos.estado !== 'abierta') {
+            mostrarToast('No hay caja abierta hoy. Abre la caja para generar el reporte.', 'warning');
+            return;
+        }
+
+        // Todo OK: abrimos el PDF en una nueva pestaña
+        mostrarToast('Generando corte PDF en tiempo real...', 'info');
+        window.open('/reporte-diario/pdf', '_blank');
+
+    } catch (error) {
+        console.error(error);
+        mostrarToast('Error al generar el reporte PDF', 'danger');
+    } finally {
+        // Siempre devolvemos el boton a su estado original
+        if (btn) {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }
+    }
 }
 
 
