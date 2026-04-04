@@ -1,17 +1,8 @@
 """
 models/usuario.py
 -----------------
-Define el modelo de usuarios del sistema. Hereda de dos clases base:
-
-1. db.Model: lo convierte en una tabla de la base de datos (via SQLAlchemy).
-2. UserMixin: es una clase auxiliar de Flask-Login que implementa automaticamente
-   los metodos requeridos para la autenticacion:
-   - is_authenticated: retorna True si el usuario ha iniciado sesion.
-   - is_active: retorna True si la cuenta esta habilitada.
-   - is_anonymous: retorna False (contrario a un usuario anonimo).
-   - get_id(): retorna el ID del usuario como string (necesario para la sesion).
-
-Al heredar de UserMixin no es necesario implementar esos metodos manualmente.
+Aqui va la base de datos de los usuarios. Heredo de UserMixin copiado de la 
+documentacion oficial para no hacer la sesion de login a mano y no aplazarme.
 """
 
 from flask_login import UserMixin
@@ -42,8 +33,11 @@ class Usuario(db.Model, UserMixin):
     # ==========================================
 
     def es_root(self):
-        """Retorna True si el usuario es el superusuario con acceso total al sistema."""
-        return self.rol == 'root'
+        # Valido si es root
+        if self.rol == 'root':
+            return True
+        else:
+            return False
 
     def es_admin_o_superior(self):
         """Retorna True si el usuario es admin o root (puede gestionar caja y productos)."""
@@ -74,13 +68,8 @@ class Usuario(db.Model, UserMixin):
         return self.rol == 'root'
 
     def roles_creables(self):
-        """
-        Retorna la lista de roles que este usuario puede asignar al crear otro usuario.
-        - root puede crear admins y empleados.
-        - admin solo puede crear empleados.
-        - empleado no puede crear usuarios.
-        """
-        if self.es_root():
+        # Si soy root creo lo que sea, si soy admin solo mozos.
+        if self.es_root() == True:
             return ['admin', 'empleado']
         if self.rol == 'admin':
             return ['empleado']

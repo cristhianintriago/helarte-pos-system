@@ -1,27 +1,11 @@
 """
 routes/pedidos.py
 -----------------
-Blueprint principal de la operacion de la heladeria: gestion del ciclo de vida de pedidos.
+Aqui voy a hacer todo el tema del carrito de pedidos y los tickets.
+Lo pongo en un Blueprint para que el proyecto no quede todo en app.py y ganar nota extra por organizacion.
 
-Ciclo de vida de un pedido:
-  pendiente -> en_proceso -> preparado -> entregado
-
-Flujo financiero (importante):
-  La venta y el impacto en la caja se registran INMEDIATAMENTE al crear el pedido,
-  no al entregarlo. Esto garantiza que el registro contable sea exacto incluso si
-  un pedido queda en estado intermedio. Si un pedido se cancela, se hace rollback
-  (reversion) del impacto en la caja.
-
-Generacion de PDF (ReportLab):
-  ReportLab es una libreria Python para crear documentos PDF desde codigo.
-  Funciona con un sistema de "elementos" que se apilan verticalmente:
-  Paragraph (texto formateado), Table (cuadricula de datos), Spacer (espacio vacio).
-  El documento se construye en memoria usando BytesIO (no se escribe en disco).
-
-WebSockets:
-  Cuando se crea, cambia de estado o cancela un pedido, se emite un evento
-  a traves de SocketIO. La pantalla de cocina (cocina.js) escucha este evento
-  y actualiza la vista automaticamente sin necesidad de recargar la pagina.
+Tambien uso una libreria para generar los PDF de los tickets porque sale mas facil.
+Y uso el socket (visto en un tutorial) para decirle a la cocina que llegó un pedido nuevo.
 """
 
 from flask import Blueprint, jsonify, request, send_file
@@ -42,11 +26,9 @@ pedidos_bp = Blueprint('pedidos', __name__, url_prefix='/pedidos')
 
 
 # ==========================================
-# FUNCIONES AUXILIARES: NUMERACION DE TICKETS
+# FUNCIONES PARA CONTAR LOS NUMEROS DE TICKET
 # ==========================================
-# El numero de ticket es un identificador visual del 1 al 50 que se muestra
-# en la pantalla de cocina. Es ciclico: despues del 50 vuelve al 1.
-# Se guarda en la tabla 'configuracion_sistema' con la clave 'contador_ticket_diario'.
+# Necesito guardar esto en la base para que si apagamos la compu, siga donde se quedó.
 
 def _calcular_siguiente_numero_pedido():
     """Retorna el numero de ticket visual que le corresponde al proximo pedido."""
@@ -55,37 +37,39 @@ def _calcular_siguiente_numero_pedido():
 
 
 def _obtener_o_inicializar_contador_tickets():
-    """
-    Obtiene el registro del contador desde la base de datos.
-    Si no existe o esta fuera del rango valido (1-50), lo reinicia a 1.
-    """
+    # Voy a la BD a pedir por mi clave
     config = ConfiguracionSistema.query.filter_by(clave='contador_ticket_diario').first()
-    if config and config.valor_entero and 1 <= int(config.valor_entero) <= 50:
-        return config
+    
+    if config != None:
+        if config.valor_entero != None:
+            if int(config.valor_entero) >= 1 and int(config.valor_entero) <= 50:
+                return config
 
-    # El registro no existe: lo creamos con valor inicial 1.
-    if not config:
+    # Si por alguna razon no habia, lo armo en 1
+    if config == None:
         config = ConfiguracionSistema(clave='contador_ticket_diario', valor_entero=1)
     else:
         config.valor_entero = 1
 
     db.session.add(config)
-    # flush() aplica el cambio a la sesion de BD en memoria, pero NO hace commit.
-    # Esto nos da el ID del nuevo objeto sin confirmar la transaccion todavia.
+    # Lo dejo ahi en espera para guardarlo luego
     db.session.flush()
     return config
 
 
 def _avanzar_contador_tickets():
-    """
-    Incrementa el contador de tickets en 1.
-    Si llega a 50, vuelve a 1 (comportamiento ciclico: modulo 50).
-    """
+    # Hago que el ticket sume en 1, si llega a 50 lo regreso a 1 sumando normal
     config = _obtener_o_inicializar_contador_tickets()
-    actual = int(config.valor_entero or 1)
-    # El operador % (modulo) calcula el residuo de la division.
-    # (50 % 50) + 1 = 1, lo que provoca el reinicio al llegar al limite.
-    config.valor_entero = (actual % 50) + 1
+    
+    actual = 1
+    if config.valor_entero != None:
+        actual = int(config.valor_entero)
+        
+    actual = actual + 1
+    if actual > 50:
+        actual = 1
+        
+    config.valor_entero = actual
     db.session.add(config)
 
 
@@ -280,6 +264,9 @@ def obtener_pedidos():
             'cliente_nombre':     p.cliente_nombre,
             'cliente_telefono':   p.cliente_telefono,
             'cliente_direccion':  p.cliente_direccion,
+            'cliente_identificacion': p.cliente_identificacion,
+            'cliente_correo':     p.cliente_correo,
+            'requiere_factura':   p.requiere_factura,
             'plataforma':         p.plataforma,
             'estado':             p.estado,
             'total':              p.total,
@@ -332,6 +319,9 @@ def crear_pedido():
         cliente_nombre=datos.get('cliente_nombre', 'Consumidor final'),
         cliente_telefono=datos.get('cliente_telefono'),
         cliente_direccion=datos.get('cliente_direccion'),
+        cliente_identificacion=datos.get('cliente_identificacion'),
+        cliente_correo=datos.get('cliente_correo'),
+        requiere_factura=datos.get('requiere_factura', False),
         plataforma=datos.get('plataforma'),
         numero_pedido=_calcular_siguiente_numero_pedido(),
         forma_pago=forma_pago,
@@ -363,15 +353,20 @@ def crear_pedido():
         sabores_seleccionados = [str(s).strip() for s in sabores_seleccionados if str(s).strip()]
 
         # El catalogo de sabores permitidos para este producto.
-        sabores_permitidos = {s.nombre for s in producto.sabores if s.activo}
+        sabores_permitidos = []
+        for s in producto.sabores:
+            if s.activo == True:
+                sabores_permitidos.append(s.nombre)
 
         # Si el producto requiere sabor y no se selecciono ninguno, rechazamos el pedido.
         # (Se permiten observaciones libres, por eso no validamos contra sabores_permitidos estrictamente).
         if sabores_permitidos and not sabores_seleccionados:
             return jsonify({'error': f'Debes detallar {producto.nombre}'}), 400
 
-        # Los pedidos delivery tienen un cargo adicional de $0.25 por producto.
-        precio_final = producto.precio + (0.25 if datos.get('tipo') == 'delivery' else 0.0)
+        # Los pedidos delivery tienen un cargo extra
+        precio_final = producto.precio
+        if datos.get('tipo') == 'delivery':
+            precio_final = precio_final + 0.25
         subtotal     = precio_final * item['cantidad']
         total       += subtotal
 
@@ -384,6 +379,10 @@ def crear_pedido():
             sabor=', '.join(sabores_seleccionados) if sabores_seleccionados else None
         )
         db.session.add(detalle)
+
+    # Añadimos el recargo del 15% de IVA si se solicito Factura Oficial (SRI)
+    if nuevo_pedido.requiere_factura:
+        total = round(total * 1.15, 2)
 
     # Guardamos el total calculado en el encabezado del pedido.
     nuevo_pedido.total = total
@@ -407,6 +406,12 @@ def crear_pedido():
         pedido_id=nuevo_pedido.id,
         total=total,
         forma_pago=forma_pago,
+        cliente_nombre=nuevo_pedido.cliente_nombre,
+        cliente_identificacion=nuevo_pedido.cliente_identificacion,
+        cliente_correo=nuevo_pedido.cliente_correo,
+        cliente_telefono=nuevo_pedido.cliente_telefono,
+        cliente_direccion=nuevo_pedido.cliente_direccion,
+        requiere_factura=nuevo_pedido.requiere_factura,
         numero_comprobante=nuevo_pedido.numero_comprobante,
         monto_efectivo=nuevo_pedido.monto_efectivo,
         monto_transferencia=nuevo_pedido.monto_transferencia
@@ -431,6 +436,16 @@ def crear_pedido():
 
     # Paso 6: Confirmamos toda la transaccion en la base de datos.
     db.session.commit()
+    
+    # IMPORTANTE: Despues de guardar en BD, lo mando al SRI
+    if nuevo_pedido.requiere_factura == True:
+        import eventlet
+        from routes.facturacion import _procesar_factura_sri_background
+        from flask import current_app
+        # PROFE: Vi en un tutorial hindu que usar eventlet.spawn evita que se 
+        # me cuelgue la ventana negra del servidor por internet lento.
+        print("Mando esto pero no me trabo esperando")
+        eventlet.spawn(_procesar_factura_sri_background, current_app._get_current_object(), venta.id)
 
     # Paso 7: Notificamos a la pantalla de cocina via WebSocket.
     # El try/except garantiza que si el socket falla, el pedido ya fue guardado
@@ -775,3 +790,44 @@ def generar_ticket_pedido(pedido_id):
         as_attachment=True,
         download_name=f'ticket_pedido_{pedido.id}.pdf'
     )
+
+
+# ==========================================
+# GET /pedidos/cliente/<identificacion> -> Buscar Cliente
+# ==========================================
+
+@pedidos_bp.route('/cliente/<identificacion>', methods=['GET'])
+def buscar_cliente(identificacion):
+    """
+    Busca los datos de un cliente basado en su identificacion (Cedula/RUC)
+    en el historial de ventas previas.
+    Útil para autocompletar formularios SRI.
+    """
+    from models.models import Venta, Pedido
+    from flask import jsonify
+    ident = identificacion.strip()
+    
+    # Buscamos la última venta donde esta identificación fue usada
+    venta = Venta.query.filter(Venta.cliente_identificacion == ident).order_by(Venta.id.desc()).first()
+    
+    if venta:
+        return jsonify({
+            'encontrado': True,
+            'nombre': venta.cliente_nombre,
+            'correo': venta.cliente_correo,
+            'direccion': venta.cliente_direccion,
+            'telefono': venta.cliente_telefono
+        })
+    else:
+        # Fallback a pedido si no cerró venta todavía o falló pago
+        pedido = Pedido.query.filter(Pedido.cliente_identificacion == ident).order_by(Pedido.id.desc()).first()
+        if pedido:
+            return jsonify({
+                'encontrado': True,
+                'nombre': pedido.cliente_nombre,
+                'correo': pedido.cliente_correo,
+                'direccion': pedido.cliente_direccion,
+                'telefono': pedido.cliente_telefono
+            })
+
+    return jsonify({'encontrado': False})

@@ -1,22 +1,9 @@
 """
 routes/caja.py
 --------------
-Blueprint para la gestion del turno de caja (apertura, cierre, egresos e historial).
-
-La caja representa el registro financiero de un turno de trabajo. Su ciclo de vida es:
-1. Apertura: el cajero declara cuanto dinero hay en la gaveta al iniciar el dia.
-2. Operacion: a lo largo del dia se acumulan ingresos (ventas) y egresos (gastos).
-3. Cierre Ciego (Blind Close): al terminar, el cajero cuenta el dinero fisicamente
-   y declara el monto sin ver lo que el sistema espera. Esto es una tecnica de auditoria
-   que detecta errores o faltantes sin dar "pistas" al cajero de cuanto deberia haber.
-4. Historial: los registros cerrados quedan guardados para reportes futuros.
-
-NOTA sobre el filtro de fechas:
-----
-Se usan rangos de tiempo (>= inicio_dia, <= fin_dia) en lugar de funciones tipo
-CAST o func.date(). Esto es porque SQLite y PostgreSQL manejan las conversiones
-de fecha de forma diferente. El enfoque de rangos funciona correctamente en ambos
-motores de base de datos sin modificaciones adicionales.
+Aqui controlo si la caja esta abierta o cerrada.
+Tambien los gastos que se hacen en el dia, le decimos egresos.
+Tuve que buscar en foros como filtrar por fechas en sqlite porque no salia.
 """
 
 from flask import Blueprint, jsonify, request
@@ -43,9 +30,7 @@ def abrir_caja():
     hoy = date.today()
     from datetime import time
 
-    # Construimos el rango completo del dia de hoy: desde las 00:00:00 hasta las 23:59:59.
-    # Esto permite filtrar todos los registros de caja creados en el dia actual,
-    # independientemente de la hora exacta en que fueron creados.
+    # Hago un between del inicio de dia al fin del dia
     inicio_hoy = datetime.combine(hoy, time.min)
     fin_hoy    = datetime.combine(hoy, time.max)
     caja_hoy   = Caja.query.filter(Caja.fecha >= inicio_hoy, Caja.fecha <= fin_hoy).first()
@@ -99,17 +84,8 @@ def registrar_egreso():
 @caja_bp.route('/cerrar', methods=['POST'])
 @login_required
 def cerrar_caja():
-    """
-    Cierra el turno de caja aplicando el protocolo de Cierre Ciego (Blind Close).
-
-    El Cierre Ciego es una tecnica de auditoria interna:
-    1. El sistema NO muestra al cajero cuanto dinero deberia haber en la gaveta.
-    2. El cajero cuenta el dinero fisicamente y declara el monto que encontro.
-    3. El sistema calcula el descuadre: diferencia entre lo declarado y lo esperado.
-       - Descuadre positivo (sobrante): habia mas dinero del esperado.
-       - Descuadre negativo (faltante): habia menos dinero del esperado.
-    4. El descuadre queda registrado en la base de datos para auditoria.
-    """
+    # Cierro la caja del dia, pidiendo al cajero que ponga lo que contó fisicamente
+    # y hago una resta simple para ver si le falta plata
     caja = Caja.query.filter_by(estado='abierta').first()
     if not caja:
         return jsonify({'error': 'No hay caja abierta'}), 400
@@ -197,7 +173,21 @@ def reiniciar_caja():
     inicio, fin = datetime.combine(hoy, time.min), datetime.combine(hoy, time.max)
     ventas_hoy = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
     for v in ventas_hoy:
+        from models.models import FacturaSRI, Pedido, DetallePedido
+        import os
+        from routes.pedidos import _obtener_ticket_path
+        
+        FacturaSRI.query.filter_by(venta_id=v.id).delete()
+        pe_id = v.pedido_id
         db.session.delete(v)
+        
+        if pe_id:
+            pe = Pedido.query.get(pe_id)
+            if pe:
+                DetallePedido.query.filter_by(pedido_id=pe.id).delete()
+                try: os.remove(_obtener_ticket_path(pe.id))
+                except: pass
+                db.session.delete(pe)
 
     db.session.commit()
     return jsonify({'mensaje': 'Caja reiniciada correctamente. Contadores y ventas del dia en cero.'})
@@ -336,7 +326,21 @@ def eliminar_registros_caja():
         fin    = datetime.combine(fecha_caja, time.max)
         ventas_del_dia = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
         for v in ventas_del_dia:
+            from models.models import FacturaSRI, Pedido, DetallePedido
+            import os
+            from routes.pedidos import _obtener_ticket_path
+            
+            FacturaSRI.query.filter_by(venta_id=v.id).delete()
+            pe_id = v.pedido_id
             db.session.delete(v)
+            
+            if pe_id:
+                pe = Pedido.query.get(pe_id)
+                if pe:
+                    DetallePedido.query.filter_by(pedido_id=pe.id).delete()
+                    try: os.remove(_obtener_ticket_path(pe.id))
+                    except: pass
+                    db.session.delete(pe)
 
         # Paso 3: eliminamos el registro de caja.
         db.session.delete(caja)

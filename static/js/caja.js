@@ -179,8 +179,9 @@ async function cargarEgresos() {
     }
 
     // Construimos un elemento HTML por cada egreso y lo agregamos al contenedor.
-    egresos.forEach(e => {
-        const div   = document.createElement('div');
+    for (let i = 0; i < egresos.length; i++) {
+        let e = egresos[i];
+        let div = document.createElement('div');
         div.className = 'list-group-item d-flex justify-content-between align-items-center';
         div.innerHTML = `
             <span>
@@ -189,7 +190,7 @@ async function cargarEgresos() {
             </span>
             <span class="fw-bold text-danger">-$${parseFloat(e.monto).toFixed(2)}</span>`;
         contenedor.appendChild(div);
-    });
+    }
 }
 
 
@@ -356,8 +357,9 @@ async function confirmarReiniciarCaja() {
  * El operador '?.' (optional chaining) previene un error si el elemento no existe en el DOM.
  * El evento 'show.bs.modal' de Bootstrap se dispara justo antes de mostrar el modal.
  */
-document.getElementById('modal-historial')
-    ?.addEventListener('show.bs.modal', async () => {
+let modalElemento = document.getElementById('modal-historial');
+if (modalElemento != null) {
+    modalElemento.addEventListener('show.bs.modal', async () => {
         const respuesta = await fetch('/caja/historial');
         const cajas     = await respuesta.json();
 
@@ -371,16 +373,19 @@ document.getElementById('modal-historial')
             return;
         }
 
-        // Construimos las filas de la tabla usando .map() y .join('').
-        let filas = cajas.map(c => `
+        // Hacemos un for para meter las filas de historial a lo bruto en un string
+        let filas = "";
+        for (let i = 0; i < cajas.length; i++) {
+            let c = cajas[i];
+            filas = filas + `
             <tr>
                 <td class="fw-bold">${c.fecha}</td>
                 <td>$${c.monto_inicial.toFixed(2)}</td>
                 <td class="text-success fw-bold">+$${c.total_ingresos.toFixed(2)}</td>
                 <td class="text-danger fw-bold">-$${c.total_egresos.toFixed(2)}</td>
                 <td class="text-primary fw-bold">$${c.monto_final.toFixed(2)}</td>
-            </tr>`
-        ).join('');
+            </tr>`;
+        }
 
         // Insertamos la tabla completa con encabezados en el contenedor del modal.
         contenedor.innerHTML = `
@@ -397,3 +402,4 @@ document.getElementById('modal-historial')
                 <tbody>${filas}</tbody>
             </table>`;
     });
+}

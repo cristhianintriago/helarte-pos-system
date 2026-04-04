@@ -1,12 +1,8 @@
 """
 models/models.py
 ----------------
-Este archivo define el esquema de la base de datos usando SQLAlchemy, que es un ORM
-(Object-Relational Mapping). Un ORM permite tratar las tablas de la base de datos como
-clases de Python y las filas como objetos, sin necesidad de escribir SQL directamente.
-
-Cada clase que hereda de db.Model se convierte en una tabla en la base de datos.
-Cada db.Column se convierte en una columna de esa tabla.
+Aqui defino mis clases para que SQLAlchemy las convierta en tablas en mi base de datos SQLite/Postgres.
+Asi no tengo que armar sentencias SQL largas a mano.
 """
 
 from flask_sqlalchemy import SQLAlchemy
@@ -19,12 +15,10 @@ db = SQLAlchemy()
 
 
 # ==========================================
-# TABLA DE ASOCIACION: producto_sabores
-# Relacion Muchos-a-Muchos (N:N)
+# TABLA INTERMEDIA: producto_sabores
 # ==========================================
-# Un producto puede tener muchos sabores (ej: Copa Mixta tiene Vainilla, Fresa, Chocolate).
-# Un sabor puede pertenecer a muchos productos (ej: Vainilla aparece en Copa y Sundae).
-# Para representar esto en SQL se usa una tabla intermedia con dos claves foraneas.
+# El profe dijo que si un helado tiene muchos sabores y un sabor esta en muchos helados
+# debemos hacer una tabla en medio para conectarlos y que no explote la base.
 producto_sabores = db.Table(
     'producto_sabores',
     db.Column('producto_id', db.Integer, db.ForeignKey('productos.id'), primary_key=True),
@@ -37,15 +31,10 @@ producto_sabores = db.Table(
 # Almacena el catalogo de helados y productos del menu
 # ==========================================
 class Producto(db.Model):
-    # __tablename__ define el nombre exacto de la tabla en la base de datos.
-    # Si no se define, SQLAlchemy usa el nombre de la clase en minusculas.
     __tablename__ = 'productos'
-
-    # primary_key=True indica que este campo es el identificador unico de cada fila.
-    # SQLAlchemy lo incrementa automaticamente (autoincrement).
     id = db.Column(db.Integer, primary_key=True)
 
-    # nullable=False significa que el campo es obligatorio; la BD rechazara un NULL.
+    # Variables obligatorias para los helados
     nombre      = db.Column(db.String(100), nullable=False)   # Ejemplo: "Copa Oreo"
     precio      = db.Column(db.Float,       nullable=False)   # Ejemplo: 3.50 (en dolares)
     categoria   = db.Column(db.String(50),  nullable=False)   # Ejemplo: "Copa", "Sundae"
@@ -60,11 +49,6 @@ class Producto(db.Model):
     # nullable=True permite que un producto no tenga imagen asignada.
     imagen_url  = db.Column(db.String(500), nullable=True)
 
-    # Relacion N:N con Sabor a traves de la tabla de asociacion 'producto_sabores'.
-    # secondary: tabla intermedia que SQLAlchemy usara para los JOIN.
-    # lazy='subquery': carga los sabores junto con la consulta del producto en una sola query.
-    # backref: crea automaticamente el atributo 'productos' dentro del modelo Sabor,
-    #          permitiendo consultar sabor.productos sin definir la relacion dos veces.
     sabores = db.relationship(
         'Sabor',
         secondary=producto_sabores,
@@ -99,8 +83,11 @@ class Pedido(db.Model):
     # Tipo de pedido: "local" (mesa) o "delivery" (domicilio).
     tipo            = db.Column(db.String(20),  nullable=False)
     cliente_nombre  = db.Column(db.String(100), nullable=False)
+    cliente_identificacion = db.Column(db.String(20), nullable=True)
+    cliente_correo  = db.Column(db.String(120), nullable=True)
     cliente_telefono  = db.Column(db.String(20),  nullable=True)
     cliente_direccion = db.Column(db.String(200), nullable=True)
+    requiere_factura  = db.Column(db.Boolean, default=False)
 
     # Plataforma de delivery externa, ej: "PedidosYa", "Rappi". Puede ser NULL si es local.
     plataforma      = db.Column(db.String(80),  nullable=True)
@@ -169,6 +156,14 @@ class Venta(db.Model):
     total     = db.Column(db.Float, nullable=False)
     fecha     = db.Column(db.DateTime, default=datetime.now)
     forma_pago = db.Column(db.String(20), default='efectivo')
+    
+    # Datos del cliente al momento de la venta
+    cliente_nombre  = db.Column(db.String(100), nullable=True)
+    cliente_identificacion = db.Column(db.String(20), nullable=True)
+    cliente_correo  = db.Column(db.String(120), nullable=True)
+    cliente_telefono  = db.Column(db.String(20),  nullable=True)
+    cliente_direccion = db.Column(db.String(200), nullable=True)
+    requiere_factura  = db.Column(db.Boolean, default=False)
 
     # Campos adicionales para auditar el desglose del pago.
     numero_comprobante  = db.Column(db.String(50), nullable=True)
@@ -238,3 +233,38 @@ class ConfiguracionSistema(db.Model):
     # Ejemplo de uso: clave='contador_ticket_diario', valor_entero=14
     clave        = db.Column(db.String(80), primary_key=True)
     valor_entero = db.Column(db.Integer,    nullable=True)
+
+# ==========================================
+# TABLA: facturas_sri
+# Control de comprobantes electronicos
+# ==========================================
+class FacturaSRI(db.Model):
+    __tablename__ = 'facturas_sri'
+
+    id               = db.Column(db.Integer, primary_key=True)
+    venta_id         = db.Column(db.Integer, db.ForeignKey('ventas.id'), nullable=False, unique=True)
+    
+    # Cadena de 49 digitos generada modulo 11
+    clave_acceso     = db.Column(db.String(49), unique=True, nullable=False)
+    
+    # SRI responde con autorizacion al aprobar
+    numero_autorizacion = db.Column(db.String(49), nullable=True)
+    
+    # ciclo: pendiente -> generado -> firmado -> enviado -> autorizado | rechazado | error_certificado | error
+    estado           = db.Column(db.String(20), default='pendiente')
+    
+    # Ej: 001001 (estab + pto_emision)
+    serie            = db.Column(db.String(6), default='001001')
+    # Ej: 000000001
+    secuencial       = db.Column(db.String(9), nullable=False)
+    
+    # Textos largos para debug y guardado de comprobante
+    xml_sin_firma    = db.Column(db.Text, nullable=True)
+    xml_firmado      = db.Column(db.Text, nullable=True)
+    mensaje_sri      = db.Column(db.Text, nullable=True)
+    
+    fecha_autorizacion = db.Column(db.DateTime, nullable=True)
+    fecha_creacion   = db.Column(db.DateTime, default=datetime.now)
+    
+    # Relacion con venta. backref asocia 1 a 1 Factura con Venta.
+    venta = db.relationship('Venta', backref=db.backref('factura_sri', uselist=False))

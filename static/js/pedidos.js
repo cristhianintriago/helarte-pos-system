@@ -54,6 +54,18 @@ const TAP_DELAY_MS = 260;   // Tiempo en ms para esperar y determinar si el tap 
 document.addEventListener('DOMContentLoaded', async () => {
     // Conectamos el buscador del catalogo al filtro en tiempo real.
     document.getElementById('buscador-carta')?.addEventListener('input', aplicarFiltrosCatalogo);
+    
+    // Auto-completado de cliente para facturacion
+    const inputIdent = document.getElementById('cliente-identificacion');
+    if (inputIdent) {
+        inputIdent.addEventListener('input', (e) => {
+            const val = e.target.value.trim();
+            // Buscar solo cuando tenga longitud valida para Ecuador (10 Cedula, 13 RUC)
+            if (val.length === 10 || val.length === 13) {
+                buscarDatosCliente(val);
+            }
+        });
+    }
 
     // Cargamos en paralelo el catalogo, los pedidos activos y el numero del siguiente ticket.
     await Promise.all([
@@ -90,6 +102,27 @@ async function cargarSiguienteNumeroPedido() {
         actualizarEtiquetaNumeroPedido();
     } catch (error) {
         console.error('No se pudo cargar contador de pedidos', error);
+    }
+}
+
+/**
+ * Busca datos historicos del cliente para autocompletar el modulo de facturacion.
+ */
+async function buscarDatosCliente(identificacion) {
+    try {
+        const resp = await fetch(`/pedidos/cliente/${identificacion}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        
+        if (data.encontrado) {
+            if (data.nombre) document.getElementById('cliente-razon-social').value = data.nombre;
+            if (data.correo) document.getElementById('cliente-correo').value = data.correo;
+            if (data.direccion) document.getElementById('cliente-direccion-sri').value = data.direccion;
+            if (data.telefono) document.getElementById('cliente-telefono-sri').value = data.telefono;
+            mostrarToast('Datos del cliente cargados del historial', 'success');
+        }
+    } catch (e) {
+        console.error("Error buscando cliente", e);
     }
 }
 
@@ -330,16 +363,26 @@ function agregarProducto(id, nombre, precio, cardElement = null) {
  */
 function agregarProductoConSabor(id, nombre, precio, sabor, cardElement = null) {
     // Buscamos si ya hay una linea igual en el carrito (mismo producto Y mismo sabor).
-    const mismaLinea = pedidoActual.productos.find(
-        (p) => p.producto_id === id && (p.sabor || null) === (sabor || null)
-    );
+    let mismaLinea = null;
+    for (let i = 0; i < pedidoActual.productos.length; i++) {
+        let saborActual = pedidoActual.productos[i].sabor;
+        if (saborActual == null) saborActual = null;
+        
+        let saborParam = sabor;
+        if (saborParam == null) saborParam = null;
+        
+        if (pedidoActual.productos[i].producto_id === id && saborActual === saborParam) {
+            mismaLinea = pedidoActual.productos[i];
+            break;
+        }
+    }
 
-    if (mismaLinea) {
+    if (mismaLinea != null) {
         // Ya existe: sumamos uno a la cantidad.
-        mismaLinea.cantidad++;
+        mismaLinea.cantidad = mismaLinea.cantidad + 1;
     } else {
         // No existe: creamos una nueva linea en el carrito.
-        pedidoActual.productos.push({ producto_id: id, nombre, precio, cantidad: 1, sabor });
+        pedidoActual.productos.push({ producto_id: id, nombre: nombre, precio: precio, cantidad: 1, sabor: sabor });
     }
 
     actualizarResumen();
@@ -358,18 +401,44 @@ function agregarProductoConSabor(id, nombre, precio, sabor, cardElement = null) 
  * @param {HTMLElement} cardElement - Tarjeta DOM para el feedback visual.
  */
 function agregarRapido(id, nombre, precio, cardElement = null) {
-    const producto   = productosCatalogo.find((p) => p.id === id);
-    if (!producto) return;
+    let producto = null;
+    for (let i = 0; i < productosCatalogo.length; i++) {
+        if (productosCatalogo[i].id === id) {
+            producto = productosCatalogo[i];
+            break;
+        }
+    }
 
-    const sabores    = (producto.sabores || []).map((s) => s.nombre);
-    const maxSabores = Number(producto.max_sabores || 1);
+    if (producto == null) return;
 
-    if (sabores.length > 0) {
-        // Tomamos los primeros maxSabores sabores de la lista como sugerencia automatica.
-        // slice(0, N) extrae los primeros N elementos de un array.
-        const sugeridos = sabores.slice(0, Math.max(1, maxSabores));
-        agregarProductoConSabor(id, nombre, precio, sugeridos.join(', '), cardElement);
-        mostrarToast(`Agregado rapido: ${sugeridos.join(', ')}`, 'info');
+    let arrSabores = [];
+    if (producto.sabores != null) {
+        for (let i = 0; i < producto.sabores.length; i++) {
+            arrSabores.push(producto.sabores[i].nombre);
+        }
+    }
+
+    let axSabores = Number(producto.max_sabores);
+    if (isNaN(axSabores)) {
+        axSabores = 1;
+    }
+
+    if (arrSabores.length > 0) {
+        let sugeridos = [];
+        let limite = axSabores;
+        if (limite < 1) {
+            limite = 1;
+        }
+
+        for (let i = 0; i < arrSabores.length; i++) {
+            if (i < limite) {
+                sugeridos.push(arrSabores[i]);
+            }
+        }
+        
+        let stringSugeridos = sugeridos.join(', ');
+        agregarProductoConSabor(id, nombre, precio, stringSugeridos, cardElement);
+        mostrarToast(`Agregado rapido: ${stringSugeridos}`, 'info');
         return;
     }
 
@@ -483,8 +552,12 @@ function abrirModalSabor(item) {
 function confirmarSaborSeleccionado() {
     if (!itemPendienteSabor) return;
 
-    const checks              = document.querySelectorAll('#selector-sabor-pedido input:checked');
-    const saboresSeleccionados = [...checks].map((c) => c.value);
+    const checks = document.querySelectorAll('#selector-sabor-pedido input:checked');
+    // Hacemos un for para ver cuales estan chequeados
+    let saboresSeleccionados = [];
+    for (let i = 0; i < checks.length; i++) {
+        saboresSeleccionados.push(checks[i].value);
+    }
 
     if (saboresSeleccionados.length === 0) {
         mostrarToast('Selecciona al menos un sabor', 'warning');
@@ -504,8 +577,14 @@ function confirmarSaborSeleccionado() {
         saboresSeleccionados.join(', ')
     );
 
-    // Cerramos el modal con optional chaining por si ya fue destruido.
-    bootstrap.Modal.getInstance(document.getElementById('modal-sabor'))?.hide();
+    // Cerramos el modal de Bootstrap
+    let modalElement = document.getElementById('modal-sabor');
+    if (modalElement) {
+        let instancia = bootstrap.Modal.getInstance(modalElement);
+        if (instancia) {
+            instancia.hide();
+        }
+    }
     itemPendienteSabor = null;
 }
 
@@ -513,6 +592,27 @@ function confirmarSaborSeleccionado() {
 // ==========================================
 // RESUMEN DEL CARRITO
 // ==========================================
+
+/**
+ * Calcula el total consolidado del pedido aplicando recargos de delivery y +15% si es factura SRI.
+ */
+function calcularTotalActual() {
+    // SUMAR EL SUBTOTAL DE CADA PRODUCTO
+    let subtotal = 0;
+    for (let i = 0; i < pedidoActual.productos.length; i++) {
+        let p = pedidoActual.productos[i];
+        let recargo = 0;
+        if (pedidoActual.tipo === 'delivery') {
+            recargo = 0.25;
+        }
+        subtotal = subtotal + ((p.precio + recargo) * p.cantidad);
+    }
+    if (pedidoActual.requiereFactura) {
+        subtotal = subtotal * 1.15;
+    }
+    // Retornamos sin redondeo estricto aquí, se redondeará al mostrar
+    return subtotal;
+}
 
 /**
  * Reconstruye y actualiza la vista del carrito activo (lista de items y total).
@@ -538,46 +638,79 @@ function actualizarResumen() {
     let total = 0;
     let items = 0;
 
-    pedidoActual.productos.forEach((item) => {
+    for (let i = 0; i < pedidoActual.productos.length; i++) {
+        let item = pedidoActual.productos[i];
+
         // Los pedidos delivery tienen un recargo de $0.25 por producto.
-        const precioUnitario = pedidoActual.tipo === 'delivery' ? item.precio + 0.25 : item.precio;
-        const subtotal       = precioUnitario * item.cantidad;
-        total  += subtotal;
-        items  += item.cantidad;
+        let precioUnitario = item.precio;
+        if (pedidoActual.tipo === 'delivery') {
+            precioUnitario = item.precio + 0.25;
+        }
+
+        let subtotal = precioUnitario * item.cantidad;
+        total = total + subtotal;
+        items = items + item.cantidad;
 
         // Escapamos las comillas simples del sabor para el atributo onclick.
-        const saborSeguro = item.sabor ? item.sabor.replace(/'/g, "\\'") : null;
+        let saborSeguro = null;
+        if (item.sabor) {
+            saborSeguro = item.sabor.replace(/'/g, "\\'");
+        }
+
+        // Armamos los pedacitos de HTML con if clasicos
+        let badgeSabor = '';
+        if (item.sabor) {
+            badgeSabor = `<span class="badge bg-light text-dark border ms-1">${item.sabor}</span>`;
+        }
+
+        let avisoDelivery = '';
+        if (pedidoActual.tipo === 'delivery') {
+            avisoDelivery = '<span class="text-warning" style="font-size: 0.65rem;">(+0.25)</span>';
+        }
+
+        let parametroClick = 'null';
+        if (saborSeguro) {
+            parametroClick = `'${saborSeguro}'`;
+        }
 
         const html = `
             <div>
                 <span class="fw-bold small">${item.nombre}</span>
-                ${item.sabor ? `<span class="badge bg-light text-dark border ms-1">${item.sabor}</span>` : ''}
+                ${badgeSabor}
                 <br>
-                <small class="text-muted">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${pedidoActual.tipo === 'delivery' ? '<span class="text-warning" style="font-size: 0.65rem;">(+0.25)</span>' : ''}</small>
+                <small class="text-muted">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${avisoDelivery}</small>
             </div>
             <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-color: #e5e7eb;" onclick="editarObservacion(${item.producto_id}, ${saborSeguro ? `'${saborSeguro}'` : 'null'})" title="Anadir Observacion">
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-color: #e5e7eb;" onclick="editarObservacion(${item.producto_id}, ${parametroClick})" title="Anadir Observacion">
                     <i class="bi bi-pencil text-muted"></i>
                 </button>
                 <span class="text-success fw-bold small">$${subtotal.toFixed(2)}</span>
-                <button class="btn btn-sm btn-outline-danger py-0" onclick="quitarProducto(${item.producto_id}, ${saborSeguro ? `'${saborSeguro}'` : 'null'})">
+                <button class="btn btn-sm btn-outline-danger py-0" onclick="quitarProducto(${item.producto_id}, ${parametroClick})">
                     <i class="bi bi-dash"></i>
                 </button>
             </div>`;
 
-        // Agregamos el mismo HTML en el contenedor de escritorio y el movil.
-        [contenedor, contenedorMobile].forEach((cont) => {
-            if (!cont) return;
-            const div = document.createElement('div');
-            div.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
-            div.innerHTML = html;
-            cont.appendChild(div);
-        });
-    });
+        // Agregamos el HTML a escritorio si existe
+        if (contenedor) {
+            let div1 = document.createElement('div');
+            div1.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
+            div1.innerHTML = html;
+            contenedor.appendChild(div1);
+        }
+        
+        // Agregamos a celular si existe
+        if (contenedorMobile) {
+            let div2 = document.createElement('div');
+            div2.className = 'd-flex justify-content-between align-items-center mb-2 p-2 bg-white rounded shadow-sm border border-light';
+            div2.innerHTML = html;
+            contenedorMobile.appendChild(div2);
+        }
+    }
 
-    document.getElementById('total-pedido').textContent = `$${total.toFixed(2)}`;
-    actualizarCheckoutTotal(total);
-    actualizarResumenMovil(total, items);
+    const total_con_iva = calcularTotalActual();
+    document.getElementById('total-pedido').textContent = `$${total_con_iva.toFixed(2)}`;
+    actualizarCheckoutTotal(total_con_iva);
+    actualizarResumenMovil(total_con_iva, items);
 }
 
 /**
@@ -672,10 +805,7 @@ function abrirCheckout() {
     }
 
     actualizarEtiquetaNumeroPedido();
-    // reduce() acumula el total calculando el precio con el recargo delivery si aplica.
-    const total = pedidoActual.productos.reduce(
-        (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
-    );
+    const total = calcularTotalActual();
     actualizarCheckoutTotal(total);
     new bootstrap.Modal(document.getElementById('modal-checkout')).show();
 }
@@ -690,9 +820,7 @@ function setTipo(tipo) {
     pedidoActual.tipo = tipo;
 
     actualizarResumen();
-    const total = pedidoActual.productos.reduce(
-        (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
-    );
+    const total = calcularTotalActual();
     actualizarCheckoutTotal(total);
 
     // Actualizamos las clases de los botones para indicar cual esta activo.
@@ -738,10 +866,29 @@ function setFormaPago(forma) {
         if (compEfectivo) compEfectivo.style.display = 'none';
     } else {
         // Mixto: efectivo + transferencia.
-        compComprobante.style.display = 'block';
         compMixto.style.display       = 'flex';
         if (compEfectivo) compEfectivo.style.display = 'none';
     }
+}
+
+/**
+ * Cambia el estado de facturacion (Consumidor Final vs SRI).
+ */
+function setFacturacion(esSRI) {
+    if (navigator.vibrate) navigator.vibrate(10);
+    pedidoActual.requiereFactura = esSRI;
+    
+    document.getElementById('btn-consfinal').className = `btn btn-sm py-2 fs-6 flex-fill fw-bold ${!esSRI ? 'btn-dark' : 'btn-outline-dark'}`;
+    document.getElementById('btn-sri').className = `btn btn-sm py-2 fs-6 flex-fill fw-bold ${esSRI ? 'btn-dark' : 'btn-outline-dark'}`;
+    
+    document.getElementById('datos-consfinal').style.display = !esSRI ? 'block' : 'none';
+    document.getElementById('datos-sri').style.display = esSRI ? 'block' : 'none';
+    
+    const badgeIva = document.getElementById('badge-iva-checkout');
+    if (badgeIva) badgeIva.style.display = esSRI ? 'inline-block' : 'none';
+    
+    // Recalcular porque aplicar IVA cambia el precio final
+    actualizarResumen();
 }
 
 /**
@@ -752,10 +899,7 @@ function setFormaPago(forma) {
 function calcularCambioEfectivo() {
     if (formaPagoActual !== 'efectivo') return;
 
-    // Calculamos el total con el posible recargo delivery.
-    const subtotalBruto = pedidoActual.productos.reduce(
-        (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
-    );
+    const subtotalFinal = calcularTotalActual();
 
     const inputRecibido = document.getElementById('monto-recibido');
     const recibido      = parseFloat(inputRecibido?.value) || 0;
@@ -770,7 +914,9 @@ function calcularCambioEfectivo() {
         return;
     }
 
-    const cambio = recibido - subtotalBruto;
+    const subTotalRounded = parseFloat(subtotalFinal.toFixed(2));
+    const recibidoRounded = parseFloat(recibido.toFixed(2));
+    const cambio = recibidoRounded - subTotalRounded;
     if (cambio >= 0) {
         cambioInput.value = cambio.toFixed(2);
         cambioInput.classList.replace('text-danger', 'text-success');
@@ -791,6 +937,16 @@ function limpiarPedido() {
     document.getElementById('numero-comprobante').value  = '';
     document.getElementById('monto-efectivo').value      = '';
     document.getElementById('monto-transferencia').value = '';
+    
+    // Limpiar factura
+    document.getElementById('cliente-direccion-basica').value = '';
+    document.getElementById('cliente-telefono-basico').value = '';
+    document.getElementById('cliente-identificacion').value = '';
+    document.getElementById('cliente-razon-social').value = '';
+    document.getElementById('cliente-correo').value = '';
+    document.getElementById('cliente-direccion-sri').value = '';
+    document.getElementById('cliente-telefono-sri').value = '';
+    
     const mr = document.getElementById('monto-recibido');
     if (mr) mr.value = '';
     const mc = document.getElementById('monto-cambio');
@@ -799,6 +955,7 @@ function limpiarPedido() {
 
     setTipo('local');
     setFormaPago('efectivo');
+    setFacturacion(false);
     actualizarResumen();
 }
 
@@ -862,11 +1019,11 @@ async function confirmarPedido() {
 
     if (formaPagoActual === 'efectivo') {
         const recibido = parseFloat(document.getElementById('monto-recibido')?.value) || 0;
-        const totalReq = pedidoActual.productos.reduce(
-            (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
-        );
-        if (recibido > 0 && recibido < totalReq) {
-            mostrarToast(`Faltan $${(totalReq - recibido).toFixed(2)} para completar el pago`, 'warning');
+        const totalReq = parseFloat(calcularTotalActual().toFixed(2));
+        const recibidoRounded = parseFloat(recibido.toFixed(2));
+        
+        if (recibidoRounded > 0 && recibidoRounded < totalReq) {
+            mostrarToast(`Faltan $${(totalReq - recibidoRounded).toFixed(2)} para completar el pago`, 'warning');
             return;
         }
     }
@@ -877,9 +1034,7 @@ async function confirmarPedido() {
             return;
         }
 
-        const totalVal = pedidoActual.productos.reduce(
-            (acc, p) => acc + ((p.precio + (pedidoActual.tipo === 'delivery' ? 0.25 : 0)) * p.cantidad), 0
-        );
+        const totalVal = calcularTotalActual();
         // Usamos margen de 0.01 para tolerar errores de redondeo en numeros decimales.
         if (Math.abs((mEfectivo + mTransferencia) - totalVal) > 0.01) {
             document.getElementById('validacion-montos').style.display = 'block';
@@ -890,13 +1045,40 @@ async function confirmarPedido() {
     }
 
     setConfirmandoPedido(true);
+    
+    const reqFact = !!pedidoActual.requiereFactura;
+    
+    let dbNombre, dbIdentificacion, dbCorreo, dbDireccion, dbTelefono;
+    
+    if (reqFact) {
+        dbIdentificacion = document.getElementById('cliente-identificacion').value.trim();
+        dbNombre = document.getElementById('cliente-razon-social').value.trim();
+        dbCorreo = document.getElementById('cliente-correo').value.trim();
+        dbDireccion = document.getElementById('cliente-direccion-sri').value.trim();
+        dbTelefono = document.getElementById('cliente-telefono-sri').value.trim();
+        
+        if (!dbIdentificacion || !dbNombre || !dbCorreo || !dbDireccion) {
+            mostrarToast('Faltan campos obligatorios para la Factura SRI', 'warning');
+            setConfirmandoPedido(false);
+            return;
+        }
+    } else {
+        dbNombre = document.getElementById('cliente-nombre').value.trim() || 'Consumidor final';
+        dbDireccion = document.getElementById('cliente-direccion-basica').value.trim() || null;
+        dbTelefono = document.getElementById('cliente-telefono-basico').value.trim() || null;
+        dbIdentificacion = '9999999999999'; // Consumidor final ID por defecto
+        dbCorreo = null;
+    }
 
     // Construimos el objeto JSON que esperan los endpoints de pedidos.
     const datos = {
         tipo:            pedidoActual.tipo,
-        cliente_nombre:  nombre || 'Consumidor final',
-        cliente_telefono: null,
-        cliente_direccion: null,
+        cliente_nombre:  dbNombre,
+        cliente_telefono: dbTelefono,
+        cliente_direccion: dbDireccion,
+        cliente_identificacion: dbIdentificacion,
+        cliente_correo:  dbCorreo,
+        requiere_factura: reqFact,
         plataforma:      null,
         forma_pago:      formaPagoActual,
         numero_comprobante: ['transferencia', 'mixto'].includes(formaPagoActual) ? numComprobante : null,
