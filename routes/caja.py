@@ -91,35 +91,32 @@ def cerrar_caja():
         return jsonify({'error': 'No hay caja abierta'}), 400
 
     datos = request.json or {}
-    monto_declarado = datos.get('monto_declarado')
-
-    # El monto declarado es obligatorio para el Cierre Ciego.
-    if monto_declarado is None:
-        return jsonify({'error': 'Debes declarar el monto fisico en caja para certificar el cierre'}), 400
-
-    # Convertimos a float y manejamos el caso de input no numerico.
-    try:
-        monto_declarado = float(monto_declarado)
-    except ValueError:
-        return jsonify({'error': 'El monto declarado no es valido'}), 400
+    monto_declarado = datos.get('monto_declarado')  # Puede ser None: cierre rapido sin contar
 
     # Calculo del monto final teorico de la caja.
-    # Formula: lo que habia al abrir + todo lo que entro - todo lo que salio.
-    caja.monto_final = caja.monto_inicial + caja.total_ingresos - caja.total_egresos
+    caja.monto_final  = caja.monto_inicial + caja.total_ingresos - caja.total_egresos
 
-    # Calculo del efectivo esperado en la gaveta fisica.
-    # Solo se cuenta el efectivo real (no transferencias) menos los egresos.
+    # Calculo del efectivo esperado en gaveta (solo efectivo, sin transferencias, menos egresos).
     efectivo_esperado = caja.monto_inicial + (caja.total_efectivo or 0.0) - caja.total_egresos
 
-    # Guardamos los datos del Cierre Ciego y marcamos la caja como cerrada.
+    # Si el cajero no declara un monto manual, usamos el efectivo esperado directamente.
+    # Esto simplifica el cierre: el sistema asume que cuadra y registra descuadre = 0.
+    if monto_declarado is None:
+        monto_declarado = efectivo_esperado
+    else:
+        try:
+            monto_declarado = float(monto_declarado)
+        except ValueError:
+            return jsonify({'error': 'El monto declarado no es valido'}), 400
+
     caja.monto_declarado = monto_declarado
-    caja.descuadre       = monto_declarado - efectivo_esperado
+    caja.descuadre       = round(monto_declarado - efectivo_esperado, 2)
     caja.estado          = 'cerrada'
 
     db.session.commit()
 
     return jsonify({
-        'mensaje': 'Caja cerrada auditada correctamente',
+        'mensaje':          'Caja cerrada correctamente',
         'monto_inicial':      caja.monto_inicial,
         'total_ingresos':     caja.total_ingresos,
         'total_efectivo':     caja.total_efectivo,

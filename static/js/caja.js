@@ -193,70 +193,75 @@ async function cargarEgresos() {
     }
 }
 
-
 // ==========================================
-// CIERRE CIEGO (BLIND CLOSE)
+// CIERRE DE CAJA
 // ==========================================
 
 /**
- * Abre el modal del Cierre Ciego limpiando el campo de monto declarado.
- * Este modal NO muestra ningun monto esperado al cajero, garantizando la imparcialidad.
+ * Paso 1: Consulta el estado actual al servidor y llena el modal
+ * de pre-cierre con los numeros reales para que el cajero los vea.
+ * No cierra nada todavia.
  */
-function iniciarCierreCaja() {
-    document.getElementById('monto-declarado').value = '';
-    if (blindCloseModal) blindCloseModal.show();
-}
-
-/**
- * Ejecuta el Cierre Ciego:
- * 1. Valida que el monto declarado sea numerico y no negativo.
- * 2. Pide confirmacion explicita al usuario.
- * 3. Envia el monto al servidor, que calcula el descuadre.
- * 4. Muestra el resultado del cuadre en un modal de resumen.
- *
- * El boton de confirmacion se desactiva durante el proceso para evitar doble envio.
- * finally {} garantiza que el boton se reactive siempre, incluso si hay un error.
- */
-async function cerrarCaja() {
-    const montoDeclarado = parseFloat(document.getElementById('monto-declarado').value);
-
-    if (isNaN(montoDeclarado) || montoDeclarado < 0) {
-        mostrarToast('Debes ingresar la cantidad de dinero exacta que tienes contada', 'warning');
+async function iniciarCierreCaja() {
+    // Pedimos el estado actualizado al servidor para tener numeros exactos
+    let datos;
+    try {
+        let respuesta = await fetch('/caja/estado');
+        datos = await respuesta.json();
+    } catch (e) {
+        mostrarToast('No se pudo cargar el estado de la caja', 'danger');
         return;
     }
 
-    if (!confirm(`Confirmas disponer exactamente de $${montoDeclarado.toFixed(2)} fisicos en la caja? Esta accion auditara y cerrara el turno.`)) return;
+    if (datos.estado !== 'abierta') {
+        mostrarToast('No hay caja abierta', 'warning');
+        return;
+    }
 
-    // Desactivamos el boton para evitar multiples clics mientras se procesa.
-    const btnClose    = document.querySelector('#modal-blind-close .btn-danger');
-    const originalText = btnClose.innerHTML;
-    btnClose.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Auditando...';
-    btnClose.disabled  = true;
+    // Calculamos el efectivo esperado en la gaveta fisica
+    let efectivoEsperado = datos.monto_inicial + (datos.total_efectivo || 0) - (datos.total_egresos || 0);
+
+    // Llenamos el modal de pre-cierre con los valores reales
+    document.getElementById('pre-total-ingresos').textContent    = '$' + datos.total_ingresos.toFixed(2);
+    document.getElementById('pre-total-efectivo').textContent    = '$' + (datos.total_efectivo || 0).toFixed(2);
+    document.getElementById('pre-total-transferencia').textContent = '$' + (datos.total_transferencia || 0).toFixed(2);
+    document.getElementById('pre-total-egresos').textContent     = '-$' + (datos.total_egresos || 0).toFixed(2);
+    document.getElementById('pre-efectivo-caja').textContent     = '$' + efectivoEsperado.toFixed(2);
+
+    // Abrimos el modal de confirmacion
+    let modalEl = document.getElementById('modal-pre-cierre');
+    new bootstrap.Modal(modalEl).show();
+}
+
+/**
+ * Paso 2: El cajero confirmo. Ejecutamos el cierre en el servidor
+ * y mostramos el resumen final.
+ */
+async function confirmarCierreCaja() {
+    // Cerramos el modal de pre-cierre
+    let modalPreEl = document.getElementById('modal-pre-cierre');
+    let modalPre   = bootstrap.Modal.getInstance(modalPreEl);
+    if (modalPre) modalPre.hide();
+
+    // Desactivar el boton para que no haga doble clic
+    let btnConfirmar = document.getElementById('btn-confirmar-cierre');
+    if (btnConfirmar) {
+        btnConfirmar.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Cerrando...';
+        btnConfirmar.disabled = true;
+    }
 
     try {
-        const respuesta = await fetch('/caja/cerrar', {
+        let respuesta = await fetch('/caja/cerrar', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ monto_declarado: montoDeclarado })
+            body:    JSON.stringify({})
         });
 
-        const datos = await respuesta.json();
+        let datos = await respuesta.json();
 
         if (respuesta.ok) {
-            if (blindCloseModal) blindCloseModal.hide();
-
-            // Construimos el HTML del resultado del descuadre segun si hay sobrante, faltante o cuadre perfecto.
-            let descuadreHTML = '';
-            if (datos.descuadre === 0) {
-                descuadreHTML = `<strong class="text-success"><i class="bi bi-check-circle-fill"></i> Cuadre Perfecto ($0.00)</strong>`;
-            } else if (datos.descuadre > 0) {
-                descuadreHTML = `<strong class="text-primary"><i class="bi bi-arrow-up-circle-fill"></i> Sobrante (+$${datos.descuadre.toFixed(2)})</strong>`;
-            } else {
-                descuadreHTML = `<strong class="text-danger"><i class="bi bi-exclamation-triangle-fill"></i> Faltante (-$${Math.abs(datos.descuadre).toFixed(2)})</strong>`;
-            }
-
-            // Inyectamos el resumen de cierre en el modal de cuadre.
-            const contenido = document.getElementById('contenido-cuadre');
+            // Llenamos el modal de resumen final
+            let contenido = document.getElementById('contenido-cuadre');
             contenido.innerHTML = `
                 <ul class="list-group list-group-flush">
                     <li class="list-group-item d-flex justify-content-between">
@@ -279,38 +284,33 @@ async function cerrarCaja() {
                         <span>Total egresos</span>
                         <strong class="text-danger">-$${datos.total_egresos.toFixed(2)}</strong>
                     </li>
-                    <li class="list-group-item d-flex justify-content-between fs-6 bg-light text-muted">
-                        <span>Sistema (Efectivo Esperado)</span>
-                        <strong>$${(datos.efectivo_esperado || 0).toFixed(2)}</strong>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between fs-6" style="background-color: #fff3cd;">
-                        <span class="fw-bold">Efectivo Declarado (Tu)</span>
-                        <strong class="fs-5">$${(datos.monto_declarado || 0).toFixed(2)}</strong>
-                    </li>
-                    <li class="list-group-item d-flex mt-2 justify-content-between fs-5 shadow-sm rounded border-0 bg-white">
-                        <span class="fw-bold text-dark">Diferencia Auditada</span>
-                        ${descuadreHTML}
+                    <li class="list-group-item d-flex justify-content-between fw-bold" style="background-color:#d1fae5;">
+                        <span>Efectivo esperado en caja</span>
+                        <strong class="fs-5">$${(datos.efectivo_esperado || 0).toFixed(2)}</strong>
                     </li>
                 </ul>`;
 
-            // Al cerrar el modal de cuadre, recargamos la pagina para mostrar la vista de caja cerrada.
-            const modalCuadre = document.getElementById('modal-cuadre');
-            if (modalCuadre) {
-                modalCuadre.addEventListener('hidden.bs.modal', function () {
-                    location.reload();
-                });
-            }
+            // Mostramos el modal de resumen y al cerrarlo recargamos
+            let modalCuadreEl = document.getElementById('modal-cuadre');
+            modalCuadreEl.addEventListener('hidden.bs.modal', function() {
+                location.reload();
+            }, { once: true });
+            new bootstrap.Modal(modalCuadreEl).show();
 
-            new bootstrap.Modal(document.getElementById('modal-cuadre')).show();
         } else {
-            mostrarToast(datos.error, 'danger');
+            mostrarToast(datos.error || 'Error al cerrar la caja', 'danger');
         }
+    } catch (e) {
+        console.error(e);
+        mostrarToast('Error de conexion al cerrar la caja', 'danger');
     } finally {
-        // Siempre reactivamos el boton, incluso si hubo un error.
-        btnClose.innerHTML = originalText;
-        btnClose.disabled  = false;
+        if (btnConfirmar) {
+            btnConfirmar.innerHTML = '<i class="bi bi-lock-fill"></i> Confirmar Cierre';
+            btnConfirmar.disabled = false;
+        }
     }
 }
+
 
 
 // ==========================================
