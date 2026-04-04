@@ -68,8 +68,6 @@ function renderizarVentasCompletadas(ventas) {
     }
 
     // Construimos una fila HTML por cada venta usando el metodo .map() y .join('').
-    // .map() transforma cada elemento del array en un string HTML.
-    // .join('') concatena todos los strings en uno solo sin separadores.
     contenedor.innerHTML = ventas.map(v => {
         // Badge visual que indica si fue un pedido delivery o local.
         const badgeTipo = v.tipo === 'delivery'
@@ -85,10 +83,113 @@ function renderizarVentasCompletadas(ventas) {
                         <i class="bi bi-clock"></i> ${v.fecha}
                     </div>
                 </div>
-                <span class="fw-bold text-success fs-6">$${parseFloat(v.total).toFixed(2)}</span>
+                <div class="d-flex align-items-center">
+                    <span class="fw-bold text-success fs-6 me-3">$${parseFloat(v.total).toFixed(2)}</span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="verDetalleVenta(${v.id})">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </div>
             </div>`;
     }).join('');
 }
+
+/**
+ * Consulta los productos y sabores de una venta especifica y los muestra en un modal.
+ * @param {number} ventaId - ID de la venta a consultar.
+ */
+async function verDetalleVenta(ventaId) {
+    const contenedor = document.getElementById('contenido-detalle-venta');
+    contenedor.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Cargando detalle...</p></div>';
+    
+    // Mostramos el modal de una vez para dar feedback de carga
+    const modal = new bootstrap.Modal(document.getElementById('modal-detalle-venta'));
+    modal.show();
+
+    try {
+        const respuesta = await fetch(`/ventas/detalle/${ventaId}`);
+        if (!respuesta.ok) throw new Error('No se pudo obtener el detalle');
+        
+        const v = await respuesta.json();
+
+        // Construimos la tabla de productos
+        let tablaProductos = v.productos.map(p => `
+            <tr>
+                <td>
+                    <div class="fw-bold">${p.producto}</div>
+                    <div class="small text-muted">${p.sabor !== 'N/A' ? 'Sabores: ' + p.sabor : ''}</div>
+                </td>
+                <td class="text-center">${p.cantidad}</td>
+                <td class="text-end">$${parseFloat(p.subtotal).toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        contenedor.innerHTML = `
+            <div class="p-4">
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <h6 class="text-muted mb-1 text-uppercase small fw-bold">Cliente</h6>
+                        <div class="fs-5 fw-bold text-dark">${v.cliente || 'Consumidor Final'}</div>
+                    </div>
+                    <div class="col-6 text-end">
+                        <h6 class="text-muted mb-1 text-uppercase small fw-bold">Fecha y Hora</h6>
+                        <div class="text-dark">${v.fecha}</div>
+                    </div>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-borderless align-middle">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="py-2">Producto / Sabores</th>
+                                <th class="py-2 text-center">Cant.</th>
+                                <th class="py-2 text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${tablaProductos}
+                        </tbody>
+                        <tfoot class="border-top">
+                            <tr class="fs-5">
+                                <td colspan="2" class="pt-3 fw-bold">TOTAL VENTA</td>
+                                <td class="pt-3 text-end fw-bold text-success">$${parseFloat(v.total).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" class="text-muted small">Método de Pago</td>
+                                <td class="text-end text-muted small text-capitalize">${v.forma_pago}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>`;
+    } catch (error) {
+        console.error(error);
+        contenedor.innerHTML = `
+            <div class="alert alert-danger m-4">
+                <i class="bi bi-exclamation-triangle"></i> No se pudo cargar la información del pedido.
+            </div>`;
+    }
+}
+
+/**
+ * Funcion de acceso directo para ver la ultima venta del dia.
+ */
+async function verUltimaVenta() {
+    try {
+        const r = await fetch('/ventas/ultimo');
+        if (!r.ok) {
+            mostrarToast('No hay ventas registradas todavía hoy', 'info');
+            return;
+        }
+        const datos = await r.json();
+        if (datos.id) {
+            verDetalleVenta(datos.id);
+        }
+    } catch (e) {
+        console.error(e);
+        mostrarToast('Error al buscar el último pedido', 'danger');
+    }
+}
+
 
 /**
  * Muestra una notificacion Toast de respaldo para este modulo.
