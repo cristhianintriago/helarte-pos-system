@@ -58,10 +58,12 @@ def obtener_ventas():
     fin_hoy_utc      = fin_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
 
     # Filtramos las ventas que cayeron dentro del dia de hoy en hora Ecuador
+    # Ordenamos por ID descendente para que el ultimo pedido salga primero en la lista.
     ventas = Venta.query.filter(
         Venta.fecha >= inicio_hoy_utc,
         Venta.fecha <= fin_hoy_utc
-    ).all()
+    ).order_by(Venta.id.desc()).all()
+
 
     lista = []
     total_vendido = 0
