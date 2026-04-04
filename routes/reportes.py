@@ -22,6 +22,17 @@ from datetime import datetime, date, time
 from sqlalchemy import func
 from io import StringIO, BytesIO
 import csv
+import pytz
+
+# Zona horaria de Ecuador (UTC-5, sin cambio de horario de verano)
+ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
+
+def a_hora_local(fecha_utc):
+    """Convierte una fecha guardada en UTC a la hora local de Ecuador."""
+    if fecha_utc is None:
+        return fecha_utc
+    fecha_con_zona = pytz.utc.localize(fecha_utc)
+    return fecha_con_zona.astimezone(ZONA_HORARIA_LOCAL)
 
 reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 
@@ -207,7 +218,7 @@ def exportar_csv():
         pedido = venta.pedido
         writer.writerow([
             venta.id,
-            venta.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+            a_hora_local(venta.fecha).strftime('%Y-%m-%d %H:%M:%S'),
             pedido.cliente_nombre if pedido else '',
             pedido.tipo           if pedido else '',
             venta.forma_pago,
@@ -250,7 +261,7 @@ def exportar_excel():
         pedido = venta.pedido
         ws.append([
             venta.id,
-            venta.fecha.strftime('%Y-%m-%d %H:%M:%S'),
+            a_hora_local(venta.fecha).strftime('%Y-%m-%d %H:%M:%S'),
             pedido.cliente_nombre if pedido else '',
             pedido.tipo           if pedido else '',
             venta.forma_pago,
@@ -292,7 +303,7 @@ def listar_ventas():
         'tipo':      v.pedido.tipo           if v.pedido else '—',
         'forma_pago': v.forma_pago,
         'total':     v.total,
-        'fecha':     v.fecha.strftime('%d/%m/%Y %H:%M')
+        'fecha':     a_hora_local(v.fecha).strftime('%d/%m/%Y %H:%M')
     } for v in ventas])
 
 
