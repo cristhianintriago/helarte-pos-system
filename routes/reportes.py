@@ -136,9 +136,19 @@ def obtener_reporte():
         Venta.fecha <= hasta
     ).group_by(Producto.nombre).order_by(func.sum(DetallePedido.cantidad).desc()).limit(5).all()
 
-    # Desglose de metodos de pago acumulado desde los objetos ya cargados en memoria.
-    efectivo      = sum(v.total for v in ventas if v.forma_pago == 'Efectivo')
-    transferencia = sum(v.total for v in ventas if v.forma_pago == 'Transferencia')
+    # Desglose por forma de pago (comparamos en minuscula porque asi se guarda en la BD)
+    efectivo      = 0.0
+    transferencia = 0.0
+    for v in ventas:
+        forma = (v.forma_pago or '').lower()
+        if forma == 'efectivo':
+            efectivo += float(v.total)
+        elif forma in ('transferencia', 'tarjeta'):
+            transferencia += float(v.total)
+        elif forma == 'mixto':
+            # En pago mixto sumamos cada parte a su categoria
+            efectivo      += float(v.monto_efectivo      or 0)
+            transferencia += float(v.monto_transferencia or 0)
 
     return jsonify({
         'total_pedidos':  len(ventas),
@@ -162,29 +172,31 @@ def obtener_reporte():
 @reportes_bp.route('/dashboard-hoy', methods=['GET'])
 @login_required
 def dashboard_hoy():
-    """
-    Retorna las ventas de hoy desglosadas por hora del dia.
-    Se usa para el grafico de lineas que muestra las horas pico de ventas.
+    # Usamos la hora local de Ecuador para el rango y para clasificar las ventas por hora
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy_local   = ahora_local.date()
 
-    Se crean listas de 24 elementos (una por cada hora del dia, de 0 a 23).
-    Por cada venta, se incrementa el valor en el indice correspondiente a su hora.
-    """
-    inicio     = datetime.combine(date.today(), time.min)
-    fin        = datetime.combine(date.today(), time.max)
-    ventas_hoy = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
+    inicio_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy_local.year, hoy_local.month, hoy_local.day, 0, 0, 0))
+    fin_local    = ZONA_HORARIA_LOCAL.localize(datetime(hoy_local.year, hoy_local.month, hoy_local.day, 23, 59, 59))
+    inicio_utc   = inicio_local.astimezone(pytz.utc).replace(tzinfo=None)
+    fin_utc      = fin_local.astimezone(pytz.utc).replace(tzinfo=None)
 
-    # Etiquetas del eje X del grafico: "00:00", "01:00", ..., "23:00".
+    ventas_hoy = Venta.query.filter(Venta.fecha >= inicio_utc, Venta.fecha <= fin_utc).all()
+
+    # Etiquetas del eje X del grafico en hora local: "00:00", "01:00", ..., "23:00".
     labels           = [f"{h:02d}:00" for h in range(24)]
-    ventas_por_hora  = [0.0] * 24   # Monto acumulado por hora.
-    tickets_por_hora = [0]   * 24   # Numero de ventas por hora.
+    ventas_por_hora  = [0.0] * 24
+    tickets_por_hora = [0]   * 24
 
     for venta in ventas_hoy:
-        hora = venta.fecha.hour
+        # Convertimos la hora UTC de la BD a la hora local de Ecuador
+        fecha_local = pytz.utc.localize(venta.fecha).astimezone(ZONA_HORARIA_LOCAL)
+        hora = fecha_local.hour
         ventas_por_hora[hora]  += float(venta.total)
         tickets_por_hora[hora] += 1
 
     return jsonify({
-        'fecha':            date.today().strftime('%Y-%m-%d'),
+        'fecha':            hoy_local.strftime('%Y-%m-%d'),
         'total_vendido_hoy': round(sum(ventas_por_hora), 2),
         'total_tickets_hoy': len(ventas_hoy),
         'labels':            labels,
