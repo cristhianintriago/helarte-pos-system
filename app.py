@@ -46,8 +46,8 @@ except ImportError:
 from flask import Flask, redirect, render_template, jsonify, url_for
 from flask_login import LoginManager, login_required, current_user
 
-# Importamos socketio desde extensions.py (no desde app.py directamente)
-# para evitar importaciones circulares. Ver extensions.py para la explicacion detallada.
+# Traigo el socket para la parte en tiempo real de la cocina. No lo traigo directo sino 
+# crashea por problema circular, lo arreglé poniendolo en otro archivo.
 from extensions import socketio
 from models.models import db
 from models.usuario import Usuario
@@ -64,6 +64,7 @@ from routes.reporte_diario import reporte_diario_bp
 from routes.usuarios import usuarios_bp
 from routes.admin import admin_bp
 from routes.cocina import cocina_bp
+from routes.facturacion import facturacion_bp
 
 import hashlib
 from datetime import date, timedelta
@@ -83,9 +84,7 @@ from sqlalchemy.pool import NullPool
 # Flask lo usa para localizar los archivos de plantillas y archivos estaticos.
 app = Flask(__name__)
 
-# Leemos la URL de la base de datos desde las variables de entorno.
-# Por defecto usamos SQLite en desarrollo local (archivo helarte.db en la carpeta instance/).
-# En produccion (Railway) esta variable apunta al servidor PostgreSQL provisionado.
+# URL de conexion: si no hay postgres uso este helartito local para salir del apuro
 database_url = os.environ.get('DATABASE_URL', 'sqlite:///helarte.db')
 
 # Railway cambia el prefijo 'postgres://' a 'postgresql://' en versiones antiguas.
@@ -97,11 +96,8 @@ if database_url and database_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI']        = database_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Evitamos advertencias innecesarias de SQLAlchemy.
 
-# NullPool: desactiva el pool de conexiones de SQLAlchemy.
-# Cuando Eventlet usa green threads, el mecanismo de locking del pool de SQLAlchemy
-# entra en conflicto con los locks de Eventlet, causando deadlocks en produccion.
-# NullPool abre y cierra una conexion nueva por cada solicitud, lo cual es seguro
-# con Eventlet y tiene un impacto minimo en rendimiento con PostgreSQL en Railway.
+# PROFE: Le tengo que poner NullPool porque como puse Eventlet arriba, chocan solos y muere.
+# Cópielo de StackOverflow.
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     'poolclass': NullPool
 }
@@ -140,12 +136,8 @@ app.config['REMEMBER_COOKIE_DURATION'] = timedelta(days=30)
 # HttpOnly: impide que JavaScript lea la cookie (proteccion contra ataques XSS).
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 
-# IMPORTANTE: REMEMBER_COOKIE_SECURE se mantiene en False siempre.
-# Si se activa (True), el navegador SOLO envia la cookie por HTTPS.
-# En local (HTTP), el navegador la rechaza silenciosamente y la sesion
-# nunca se restaura aunque la cookie se haya creado correctamente.
-# En produccion Railway, el servidor ya fuerza HTTPS a nivel de infraestructura,
-# por lo que la seguridad no se ve comprometida con este valor en False.
+# La cookie solo va sobre HTTP en mi compu. En internet me obligan a poner HTTPS pero yo la
+# dejo en false aqui para evitar que me rebote:
 app.config['REMEMBER_COOKIE_SECURE']   = False
 
 
@@ -207,6 +199,7 @@ app.register_blueprint(reportes_bp)
 app.register_blueprint(reporte_diario_bp)
 app.register_blueprint(usuarios_bp)
 app.register_blueprint(admin_bp)
+app.register_blueprint(facturacion_bp)
 
 
 # ==========================================
@@ -258,10 +251,22 @@ def _sincronizar_esquema_legacy():
     _agregar_columna_si_falta('pedidos', 'plataforma',          'ALTER TABLE pedidos ADD COLUMN plataforma VARCHAR(80)')
     _agregar_columna_si_falta('pedidos', 'monto_efectivo',      'ALTER TABLE pedidos ADD COLUMN monto_efectivo FLOAT')
     _agregar_columna_si_falta('pedidos', 'monto_transferencia', 'ALTER TABLE pedidos ADD COLUMN monto_transferencia FLOAT')
+    _agregar_columna_si_falta('pedidos', 'cliente_identificacion', 'ALTER TABLE pedidos ADD COLUMN cliente_identificacion VARCHAR(20)')
+    _agregar_columna_si_falta('pedidos', 'cliente_correo',      'ALTER TABLE pedidos ADD COLUMN cliente_correo VARCHAR(120)')
+    # BOOOLEAN field in SQLite es un Integer, en postgres es BOOLEAN. Como SQLite en local usa 0/1, 
+    # DDL debe ser compatible. Usaremos BOOLEAN que SQLAlchemy sabe mapear en ambos. 
+    # Default = FALSE. En PostgreSQL: BOOLEAN DEFAULT FALSE. En SQLite: BOOLEAN DEFAULT 0.
+    _agregar_columna_si_falta('pedidos', 'requiere_factura',    'ALTER TABLE pedidos ADD COLUMN requiere_factura BOOLEAN DEFAULT FALSE')
 
     _agregar_columna_si_falta('ventas', 'numero_comprobante',  'ALTER TABLE ventas ADD COLUMN numero_comprobante VARCHAR(50)')
     _agregar_columna_si_falta('ventas', 'monto_efectivo',      'ALTER TABLE ventas ADD COLUMN monto_efectivo FLOAT')
     _agregar_columna_si_falta('ventas', 'monto_transferencia', 'ALTER TABLE ventas ADD COLUMN monto_transferencia FLOAT')
+    _agregar_columna_si_falta('ventas', 'cliente_nombre',      'ALTER TABLE ventas ADD COLUMN cliente_nombre VARCHAR(100)')
+    _agregar_columna_si_falta('ventas', 'cliente_identificacion', 'ALTER TABLE ventas ADD COLUMN cliente_identificacion VARCHAR(20)')
+    _agregar_columna_si_falta('ventas', 'cliente_correo',      'ALTER TABLE ventas ADD COLUMN cliente_correo VARCHAR(120)')
+    _agregar_columna_si_falta('ventas', 'cliente_telefono',    'ALTER TABLE ventas ADD COLUMN cliente_telefono VARCHAR(20)')
+    _agregar_columna_si_falta('ventas', 'cliente_direccion',   'ALTER TABLE ventas ADD COLUMN cliente_direccion VARCHAR(200)')
+    _agregar_columna_si_falta('ventas', 'requiere_factura',    'ALTER TABLE ventas ADD COLUMN requiere_factura BOOLEAN DEFAULT FALSE')
 
     _agregar_columna_si_falta('caja', 'total_efectivo',      'ALTER TABLE caja ADD COLUMN total_efectivo FLOAT')
     _agregar_columna_si_falta('caja', 'total_transferencia', 'ALTER TABLE caja ADD COLUMN total_transferencia FLOAT')

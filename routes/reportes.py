@@ -317,7 +317,24 @@ def eliminar_ventas():
     for venta_id in ids:
         v = Venta.query.get(venta_id)
         if v:
+            from models.models import FacturaSRI, Pedido, DetallePedido
+            FacturaSRI.query.filter_by(venta_id=v.id).delete()
+            
+            # El usuario pide borrar todo tipo de ticket generado (Pedido) para los ambientes de prueba.
+            pe_id = v.pedido_id
             db.session.delete(v)
+            if pe_id:
+                pe = Pedido.query.get(pe_id)
+                if pe:
+                    DetallePedido.query.filter_by(pedido_id=pe.id).delete()
+                    import os
+                    from routes.pedidos import _obtener_ticket_path
+                    try:
+                        os.remove(_obtener_ticket_path(pe.id))
+                    except:
+                        pass
+                    db.session.delete(pe)
+
             eliminadas += 1
 
     db.session.commit()
