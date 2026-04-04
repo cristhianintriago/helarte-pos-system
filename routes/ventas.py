@@ -94,3 +94,52 @@ def obtener_ventas():
         'total_delivery': total_delivery,
         'total_local': total_local
     })
+
+
+@ventas_bp.route('/detalle/<int:id>', methods=['GET'])
+@login_required
+def obtener_detalle_venta(id):
+    """
+    Retorna el desglose de productos de una venta especifica.
+    Util para que el cajero pueda revisar que se vendio exactamente.
+    """
+    venta = Venta.query.get_or_404(id)
+    pedido = venta.pedido
+
+    detalles = []
+    for d in pedido.detalles:
+        detalles.append({
+            'producto': d.producto.nombre,
+            'cantidad': d.cantidad,
+            'sabor': d.sabor or 'N/A',
+            'subtotal': d.subtotal
+        })
+
+    return jsonify({
+        'id': venta.id,
+        'cliente': venta.cliente_nombre,
+        'fecha': a_hora_local(venta.fecha).strftime('%d/%m/%Y %H:%M'),
+        'total': venta.total,
+        'forma_pago': venta.forma_pago,
+        'productos': detalles
+    })
+
+
+@ventas_bp.route('/ultimo', methods=['GET'])
+@login_required
+def obtener_ultima_venta_hoy():
+    """Retorna el ID de la venta mas reciente de hoy."""
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy = ahora_local.date()
+
+    inicio_hoy_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 0, 0, 0))
+    inicio_hoy_utc   = inicio_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+
+    venta = Venta.query.filter(Venta.fecha >= inicio_hoy_utc).order_by(Venta.id.desc()).first()
+    
+    if not venta:
+        return jsonify({'id': None}), 404
+        
+    return jsonify({'id': venta.id})
+
+
