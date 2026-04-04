@@ -71,7 +71,8 @@ def generar_pdf_fecha(fecha):
     ).first()
 
     if not caja:
-        return jsonify({'error': 'No hay registro de caja para este día'}), 404
+        # Si no hay caja abierta ni cerrada hoy, no hay nada que reportar
+        return jsonify({'error': 'No hay caja registrada para este dia. Abre la caja primero.'}), 404
 
     # Ventas del día
     ventas = Venta.query.filter(
@@ -181,9 +182,13 @@ def generar_pdf_fecha(fecha):
         elementos.append(logo)
         elementos.append(Spacer(1, 0.08 * inch))
 
-    elementos.append(Paragraph("Helarte · Reporte Diario", titulo_style))
+    import pytz
+    tz_local = pytz.timezone('America/Guayaquil')
+    ahora_local = datetime.now(tz_local)
+    
+    elementos.append(Paragraph("Helarte · Reporte de Corte", titulo_style))
     elementos.append(Paragraph(
-        f"Fecha operativa: {fecha.strftime('%d/%m/%Y')} · Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        f"Fecha operativa: {fecha.strftime('%d/%m/%Y')} &nbsp;&nbsp; Corte generado: {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora Ecuador)",
         subtitulo_style
     ))
 
@@ -246,8 +251,11 @@ def generar_pdf_fecha(fecha):
         ['Concepto', 'Monto'],
         ['Monto Inicial', f'${caja.monto_inicial:.2f}'],
         ['Total Ingresos', f'${caja.total_ingresos:.2f}'],
+        ['  Efectivo', f'${float(caja.total_efectivo or 0):.2f}'],
+        ['  Transferencia', f'${float(caja.total_transferencia or 0):.2f}'],
         ['Total Egresos', f'${caja.total_egresos:.2f}'],
-        ['Monto Final', f'${caja.monto_final:.2f}']
+        ['Balance Actual', f'${(caja.monto_inicial + caja.total_ingresos - caja.total_egresos):.2f}'],
+        ['Estado Caja', caja.estado.upper()],
     ]
     
     tabla_caja = Table(datos_caja, colWidths=[3.5*inch, 2.5*inch])
