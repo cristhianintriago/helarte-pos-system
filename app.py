@@ -67,7 +67,7 @@ from routes.cocina import cocina_bp
 from routes.facturacion import facturacion_bp
 
 import hashlib
-from datetime import date, timedelta
+from datetime import datetime, date, timedelta
 from flask_bcrypt import Bcrypt
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
