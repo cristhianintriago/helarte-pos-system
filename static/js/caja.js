@@ -383,7 +383,11 @@ if (modalElemento != null) {
                 <td>$${c.monto_inicial.toFixed(2)}</td>
                 <td class="text-success fw-bold">+$${c.total_ingresos.toFixed(2)}</td>
                 <td class="text-danger fw-bold">-$${c.total_egresos.toFixed(2)}</td>
-                <td class="text-primary fw-bold">$${c.monto_final.toFixed(2)}</td>
+                <td class="text-primary fw-bold">$${c.efectivo_esperado.toFixed(2)}</td>
+                <td class="fw-bold">$${c.monto_declarado.toFixed(2)}</td>
+                <td class="${c.descuadre < 0 ? 'text-danger' : (c.descuadre > 0 ? 'text-success' : 'text-muted')} fw-bold">
+                    ${c.descuadre >= 0 ? '+' : ''}$${c.descuadre.toFixed(2)}
+                </td>
             </tr>`;
         }
 
@@ -396,7 +400,9 @@ if (modalElemento != null) {
                         <th>Inicial</th>
                         <th>Ingresos</th>
                         <th>Egresos</th>
-                        <th>Final</th>
+                        <th>Esperado</th>
+                        <th>Declarado</th>
+                        <th>Descuadre</th>
                     </tr>
                 </thead>
                 <tbody>${filas}</tbody>
