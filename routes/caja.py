@@ -15,6 +15,15 @@ import pytz
 # Zona horaria de Ecuador (mismo estandar que ventas.py y reportes.py)
 ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
 
+def a_hora_local(fecha_utc):
+    """Convierte una fecha guardada en UTC a la hora local de Ecuador."""
+    if fecha_utc is None:
+        return None
+    # Le decimos a Python que la fecha es UTC primero
+    fecha_con_zona = pytz.utc.localize(fecha_utc)
+    # Luego la convertimos a Ecuador
+    return fecha_con_zona.astimezone(ZONA_HORARIA_LOCAL)
+
 caja_bp = Blueprint('caja', __name__, url_prefix='/caja')
 
 
@@ -304,12 +313,13 @@ def historial_cajas():
 
     return jsonify([{
         'id':             c.id,
-        'fecha':          c.fecha.strftime('%d/%m/%Y'),
+        'fecha':          a_hora_local(c.fecha).strftime('%d/%m/%Y'),
         'monto_inicial':  float(c.monto_inicial),
         'total_ingresos': float(c.total_ingresos),
         'total_egresos':  float(c.total_egresos),
-        # Si monto_final es NULL (caja reiniciada sin cerrar), devolvemos 0.0.
-        'monto_final':    float(c.monto_final) if c.monto_final else 0.0
+        'efectivo_esperado': float(c.monto_inicial + (c.total_efectivo or 0.0) - c.total_egresos),
+        'monto_declarado': float(c.monto_declarado) if c.monto_declarado is not None else 0.0,
+        'descuadre':      float(c.descuadre) if c.descuadre is not None else 0.0
     } for c in cajas])
 
 
