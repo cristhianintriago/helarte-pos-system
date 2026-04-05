@@ -70,9 +70,12 @@ import hashlib
 from datetime import date, timedelta
 from flask_bcrypt import Bcrypt
 from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from sqlalchemy import inspect, text
 from sqlalchemy.pool import NullPool
+import pytz
+
+# Zona horaria de Ecuador (mismo estandar que ventas.py y reportes.py)
+ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
 
 
 # ==========================================
@@ -340,7 +343,9 @@ with app.app_context():
 @login_required
 def index():
     """Renderiza el dashboard principal. Pasa la fecha de hoy para el encabezado."""
-    return render_template('index.html', fecha_hoy=date.today().strftime('%d/%m/%Y'))
+    # Obtenemos la fecha de HOY segun la hora local de Ecuador.
+    fecha_local = datetime.now(ZONA_HORARIA_LOCAL).strftime('%d/%m/%Y')
+    return render_template('index.html', fecha_hoy=fecha_local)
 
 
 @app.route('/resumen')
@@ -351,23 +356,38 @@ def resumen():
     Es consumido por el dashboard (index.html) para mostrar los indicadores en tiempo real.
     """
     from models.models import Pedido, Venta, Caja
+    from datetime import time
 
-    # Contamos pedidos que estan activos (en cocina o pendientes de preparar).
+    # PROFE: Aqui esta el truco. No usamos date.today() del servidor (UTC).
+    # Usamos la hora de Ecuador para saber que dia es 'hoy' para el negocio.
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy = ahora_local.date()
+
+    # Rango del dia local convertido a UTC para filtrar en la base de datos (donde todo es UTC)
+    inicio_hoy_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 0, 0, 0))
+    fin_hoy_local    = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 23, 59, 59))
+    inicio_hoy_utc   = inicio_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+    fin_hoy_utc      = fin_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+
+    # Contamos pedidos que estan activos (en cocina o pendientes de preparar) sin importar la fecha.
     pedidos_activos = Pedido.query.filter(
         Pedido.estado.in_(['pendiente', 'en_proceso'])
     ).count()
 
-    # Obtenemos las ventas de hoy usando db.func.date() para ignorar la hora.
+    # Obtenemos las ventas registradas entre el inicio y fin de HOY segun hora local.
     ventas_hoy = Venta.query.filter(
-        db.func.date(Venta.fecha) == date.today()
+        Venta.fecha >= inicio_hoy_utc,
+        Venta.fecha <= fin_hoy_utc
     ).all()
 
-    # List comprehension: suma los totales de todos los objetos Venta en la lista.
+    # Suma de totales de ventas del dia.
     total_vendido = sum(v.total for v in ventas_hoy)
 
-    # Buscamos si hay una caja abierta hoy para mostrar el estado en el dashboard.
+    # Buscamos si hay una caja abierta para el dia actual del negocio.
+    # El filtro por estado 'abierta' es el mas importante.
     caja = Caja.query.filter(
-        db.func.date(Caja.fecha) == date.today(),
+        Caja.fecha >= inicio_hoy_utc,
+        Caja.fecha <= fin_hoy_utc,
         Caja.estado == 'abierta'
     ).first()
 
@@ -378,6 +398,7 @@ def resumen():
         'caja_abierta':    caja is not None,
         'monto_caja':      float(caja.monto_inicial) if caja else 0
     })
+
 
 
 @app.route('/pedidos')

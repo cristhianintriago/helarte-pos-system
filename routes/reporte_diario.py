@@ -11,17 +11,24 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 import io
 import os
+import pytz
+
+# Zona horaria de Ecuador (mismo estandar que el resto de modulos)
+ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
 
 # Blueprint para los reportes diarios
 reporte_diario_bp = Blueprint('reporte_diario', __name__, url_prefix='/reporte-diario')
 
 
+
 @reporte_diario_bp.route('/pdf', methods=['GET'])
 @login_required
 def generar_pdf():
-    """Genera PDF del reporte diario para hoy"""
-    hoy = date.today()
+    """Genera PDF del reporte diario para hoy (Hora Ecuador)"""
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy = ahora_local.date()
     return generar_pdf_fecha(hoy)
+
 
 
 @reporte_diario_bp.route('/pdf/<string:fecha>', methods=['GET'])
@@ -39,13 +46,19 @@ def generar_pdf_historico(fecha):
 @login_required
 def listar_historial():
     """Lista los últimos 30 días con reportes disponibles"""
-    hace_30_dias = date.today() - timedelta(days=30)
+    # Usamos hoy segun Ecuador
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy_local = ahora_local.date()
+    hace_30_dias = hoy_local - timedelta(days=30)
     
-    inicio_30_dias = datetime.combine(hace_30_dias, datetime.min.time())
+    # Convertimos a UTC para consultar en la base de datos
+    inicio_30_local = ZONA_HORARIA_LOCAL.localize(datetime(hace_30_dias.year, hace_30_dias.month, hace_30_dias.day, 0, 0, 0))
+    inicio_30_utc   = inicio_30_local.astimezone(pytz.utc).replace(tzinfo=None)
     
     cajas = Caja.query.filter(
-        Caja.fecha >= inicio_30_dias
+        Caja.fecha >= inicio_30_utc
     ).order_by(Caja.fecha.desc()).all()
+
     
     return jsonify([{
         'fecha': str(caja.fecha.date()),
@@ -57,18 +70,21 @@ def listar_historial():
 def generar_pdf_fecha(fecha):
     """
     Lógica principal para estructurar y dibujar el reporte PDF usando la librería ReportLab.
-    Acumula datos de las ventas, cajas, y productos de un día puntual en memoria y luego dibuja las tablas.
-    Los emojis usados aquí forman parte del reporte visual (interfaz con el cliente final).
+    'fecha' es un objeto date en horario local.
     """
-    # 1. Obtener datos del día a procesar configurando el rango de tiempo de horas y minutos.
-    inicio_dia = datetime.combine(fecha, datetime.min.time())
-    fin_dia = datetime.combine(fecha, datetime.max.time())
+    # 1. Obtener rango en UTC para consultar la base de datos
+    inicio_dia_local = ZONA_HORARIA_LOCAL.localize(datetime(fecha.year, fecha.month, fecha.day, 0, 0, 0))
+    fin_dia_local    = ZONA_HORARIA_LOCAL.localize(datetime(fecha.year, fecha.month, fecha.day, 23, 59, 59))
+    
+    inicio_dia_utc = inicio_dia_local.astimezone(pytz.utc).replace(tzinfo=None)
+    fin_dia_utc    = fin_dia_local.astimezone(pytz.utc).replace(tzinfo=None)
 
     # Caja del día
     caja = Caja.query.filter(
-        Caja.fecha >= inicio_dia,
-        Caja.fecha <= fin_dia
+        Caja.fecha >= inicio_dia_utc,
+        Caja.fecha <= fin_dia_utc
     ).first()
+
 
     if not caja:
         # Si no hay caja abierta ni cerrada hoy, no hay nada que reportar
@@ -76,51 +92,60 @@ def generar_pdf_fecha(fecha):
 
     # Ventas del día
     ventas = Venta.query.filter(
-        Venta.fecha >= inicio_dia,
-        Venta.fecha <= fin_dia
+        Venta.fecha >= inicio_dia_utc,
+        Venta.fecha <= fin_dia_utc
     ).all()
+
 
     # Pedidos por tipo
     pedidos_local = Pedido.query.join(Venta).filter(
-        Venta.fecha >= inicio_dia,
-        Venta.fecha <= fin_dia,
+        Venta.fecha >= inicio_dia_utc,
+        Venta.fecha <= fin_dia_utc,
         Pedido.tipo == 'local'
     ).count()
 
     pedidos_delivery = Pedido.query.join(Venta).filter(
-        Venta.fecha >= inicio_dia,
-        Venta.fecha <= fin_dia,
+        Venta.fecha >= inicio_dia_utc,
+        Venta.fecha <= fin_dia_utc,
         Pedido.tipo == 'delivery'
     ).count()
+
 
     # Producto más vendido
     top_producto = db.session.query(
         Producto.nombre,
         func.sum(DetallePedido.cantidad).label('cantidad')
     ).join(DetallePedido).join(Pedido).join(Venta).filter(
-        Venta.fecha >= inicio_dia,
-        Venta.fecha <= fin_dia
+        Venta.fecha >= inicio_dia_utc,
+        Venta.fecha <= fin_dia_utc
     ).group_by(Producto.nombre).order_by(func.sum(DetallePedido.cantidad).desc()).first()
 
     top_productos = db.session.query(
         Producto.nombre,
         func.sum(DetallePedido.cantidad).label('cantidad')
     ).join(DetallePedido).join(Pedido).join(Venta).filter(
-        Venta.fecha >= inicio_dia,
-        Venta.fecha <= fin_dia
+        Venta.fecha >= inicio_dia_utc,
+        Venta.fecha <= fin_dia_utc
     ).group_by(Producto.nombre).order_by(func.sum(DetallePedido.cantidad).desc()).limit(5).all()
+
 
     # Egresos del día
     egresos = Egreso.query.filter_by(caja_id=caja.id).all()
 
-    # Comparación con día anterior
+    # Comparación con día anterior (local)
     dia_anterior = fecha - timedelta(days=1)
-    inicio_anterior = datetime.combine(dia_anterior, datetime.min.time())
-    fin_anterior = datetime.combine(dia_anterior, datetime.max.time())
+    
+    inicio_ant_local = ZONA_HORARIA_LOCAL.localize(datetime(dia_anterior.year, dia_anterior.month, dia_anterior.day, 0, 0, 0))
+    fin_ant_local    = ZONA_HORARIA_LOCAL.localize(datetime(dia_anterior.year, dia_anterior.month, dia_anterior.day, 23, 59, 59))
+    
+    inicio_ant_utc = inicio_ant_local.astimezone(pytz.utc).replace(tzinfo=None)
+    fin_ant_utc    = fin_ant_local.astimezone(pytz.utc).replace(tzinfo=None)
+
     caja_anterior = Caja.query.filter(
-        Caja.fecha >= inicio_anterior,
-        Caja.fecha <= fin_anterior
+        Caja.fecha >= inicio_ant_utc,
+        Caja.fecha <= fin_ant_utc
     ).first()
+
 
     # 2. Crear PDF
     buffer = io.BytesIO()
