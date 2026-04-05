@@ -10,6 +10,10 @@ from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from models.models import db, Caja, Egreso, Venta
 from datetime import datetime, date
+import pytz
+
+# Zona horaria de Ecuador (mismo estandar que ventas.py y reportes.py)
+ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
 
 caja_bp = Blueprint('caja', __name__, url_prefix='/caja')
 
@@ -27,13 +31,22 @@ def abrir_caja():
     """
     from flask_login import current_user
 
-    hoy = date.today()
+    # Determinamos que dia es hoy segun la zona horaria del negocio, no del servidor.
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy = ahora_local.date()
     from datetime import time
 
-    # Hago un between del inicio de dia al fin del dia
-    inicio_hoy = datetime.combine(hoy, time.min)
-    fin_hoy    = datetime.combine(hoy, time.max)
-    caja_hoy   = Caja.query.filter(Caja.fecha >= inicio_hoy, Caja.fecha <= fin_hoy).first()
+    # Construimos el rango del dia completo en hora local para luego convertir a UTC.
+    # Esto es necesario porque la base de datos guarda todo en UTC estandar.
+    inicio_hoy_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 0, 0, 0))
+    fin_hoy_local    = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 23, 59, 59))
+    
+    # Convertimos los limites a UTC para la consulta SQL.
+    inicio_hoy_utc = inicio_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+    fin_hoy_utc    = fin_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+
+    # Buscamos si ya existe una caja registrada para el dia de hoy (version local).
+    caja_hoy = Caja.query.filter(Caja.fecha >= inicio_hoy_utc, Caja.fecha <= fin_hoy_utc).first()
 
     if caja_hoy:
         if caja_hoy.estado == 'abierta':
@@ -145,11 +158,19 @@ def reiniciar_caja():
 
     caja = Caja.query.filter_by(estado='abierta').first()
     if not caja:
-        # Si no hay caja abierta, buscamos la de hoy para reabrirla antes de reiniciar.
-        hoy = date.today()
+        # Si la caja ya fue cerrada, buscamos la del dia actual para mostrar sus egresos.
+        # Debemos asegurar que 'hoy' sea segun la hora de Ecuador.
+        ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+        hoy = ahora_local.date()
         from datetime import time
-        inicio, fin = datetime.combine(hoy, time.min), datetime.combine(hoy, time.max)
-        caja = Caja.query.filter(Caja.fecha >= inicio, Caja.fecha <= fin).first()
+
+        # Rango del dia local convertido a UTC para la base de datos
+        inicio_hoy_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 0, 0, 0))
+        fin_hoy_local    = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 23, 59, 59))
+        inicio_hoy_utc   = inicio_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+        fin_hoy_utc      = fin_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+
+        caja = Caja.query.filter(Caja.fecha >= inicio_hoy_utc, Caja.fecha <= fin_hoy_utc).first()
         if not caja:
             return jsonify({'error': 'No hay caja registrada hoy'}), 404
         caja.estado = 'abierta'
@@ -235,17 +256,21 @@ def obtener_egresos():
     caja = Caja.query.filter_by(estado='abierta').first()
 
     if not caja:
-        # Si la caja ya fue cerrada, buscamos la del dia actual para mostrar sus egresos.
-        hoy = date.today()
+        # Determinamos que dia es hoy segun la zona horaria de Ecuador (America/Guayaquil)
+        ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+        hoy = ahora_local.date()
         from datetime import time
-        caja = Caja.query.filter(
-            Caja.fecha >= datetime.combine(hoy, time.min),
-            Caja.fecha <= datetime.combine(hoy, time.max)
-        ).first()
 
-    if not caja:
-        # Si no existe ninguna caja hoy, retornamos una lista vacia.
-        return jsonify([])
+        # Definimos el rango del dia local convertido a UTC para buscar en la base de datos
+        inicio_hoy_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 0, 0, 0))
+        fin_hoy_local    = ZONA_HORARIA_LOCAL.localize(datetime(hoy.year, hoy.month, hoy.day, 23, 59, 59))
+        inicio_hoy_utc   = inicio_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+        fin_hoy_utc      = fin_hoy_local.astimezone(pytz.utc).replace(tzinfo=None)
+
+        # Buscamos la caja (sea abierta o cerrada) que corresponda al dia de hoy en el local
+        caja = Caja.query.filter(Caja.fecha >= inicio_hoy_utc, Caja.fecha <= fin_hoy_utc).first()
+        if not caja:
+            return jsonify([])
 
     egresos = Egreso.query.filter_by(caja_id=caja.id).all()
     return jsonify([{
@@ -262,17 +287,20 @@ def historial_cajas():
     Retorna los registros de caja cerrados de los ultimos 30 dias.
     Este historial se muestra en la seccion de reportes del modulo de caja.
     """
-    from datetime import timedelta, time
-
-    # Calculamos el limite inferior de la consulta: 30 dias atras desde hoy.
-    hace_30_dias = date.today() - timedelta(days=30)
-    # Construimos el datetime de inicio para el filtro de rango.
-    inicio_30 = datetime.combine(hace_30_dias, time.min)
+    # Calculamos el limite inferior de la consulta: 30 dias atras desde hoy (Ecuador).
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy = ahora_local.date()
+    hace_30_dias = hoy - timedelta(days=30)
+    
+    # Convertimos el inicio de hace 30 dias (local) a UTC para la base de datos.
+    inicio_30_local = ZONA_HORARIA_LOCAL.localize(datetime(hace_30_dias.year, hace_30_dias.month, hace_30_dias.day, 0, 0, 0))
+    inicio_30_utc   = inicio_30_local.astimezone(pytz.utc).replace(tzinfo=None)
 
     cajas = Caja.query.filter(
         Caja.estado == 'cerrada',
-        Caja.fecha >= inicio_30
+        Caja.fecha >= inicio_30_utc
     ).order_by(Caja.fecha.desc()).all()
+
 
     return jsonify([{
         'id':             c.id,
@@ -317,11 +345,18 @@ def eliminar_registros_caja():
         Egreso.query.filter_by(caja_id=caja.id).delete()
 
         # Paso 2: eliminamos las ventas del dia que corresponde a esta caja.
-        # Usamos un rango de tiempo para ser compatibles con SQLite y PostgreSQL.
-        fecha_caja = caja.fecha.date()
-        inicio = datetime.combine(fecha_caja, time.min)
-        fin    = datetime.combine(fecha_caja, time.max)
-        ventas_del_dia = Venta.query.filter(Venta.fecha >= inicio, Venta.fecha <= fin).all()
+        # Debemos convertir la fecha de la caja (UTC) a local para determinar el rango correcto del dia.
+        fecha_local = caja.fecha.replace(tzinfo=pytz.utc).astimezone(ZONA_HORARIA_LOCAL)
+        dia_local   = fecha_local.date()
+
+        # Rango del dia local vuelto a convertir a UTC para la consulta.
+        inicio_l = ZONA_HORARIA_LOCAL.localize(datetime(dia_local.year, dia_local.month, dia_local.day, 0, 0, 0))
+        fin_l    = ZONA_HORARIA_LOCAL.localize(datetime(dia_local.year, dia_local.month, dia_local.day, 23, 59, 59))
+        inicio_u = inicio_l.astimezone(pytz.utc).replace(tzinfo=None)
+        fin_u    = fin_l.astimezone(pytz.utc).replace(tzinfo=None)
+
+        ventas_del_dia = Venta.query.filter(Venta.fecha >= inicio_u, Venta.fecha <= fin_u).all()
+
         for v in ventas_del_dia:
             from models.models import FacturaSRI, Pedido, DetallePedido
             import os

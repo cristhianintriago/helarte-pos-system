@@ -44,21 +44,29 @@ reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 def _rango_fechas(desde_str, hasta_str):
     """
     Convierte strings de fecha en objetos datetime con hora de inicio y fin.
-    Si no se reciben parametros, usa el dia de hoy por defecto.
-
-    Parametros:
-    - desde_str: string en formato 'YYYY-MM-DD' o None.
-    - hasta_str: string en formato 'YYYY-MM-DD' o None.
-
-    Retorna una tupla (desde, hasta) de objetos datetime.
-    'hasta' se ajusta a las 23:59:59 para incluir todas las ventas del dia final.
+    Si no se reciben parametros, usa el dia de hoy segun Ecuador por defecto.
     """
-    hoy       = date.today()
-    desde_str = desde_str or hoy.strftime('%Y-%m-%d')
-    hasta_str = hasta_str or hoy.strftime('%Y-%m-%d')
-    desde     = datetime.strptime(desde_str, '%Y-%m-%d')
-    hasta     = datetime.strptime(hasta_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-    return desde, hasta
+    # Determinamos 'hoy' segun Ecuador
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    hoy_local   = ahora_local.date()
+
+    desde_str = desde_str or hoy_local.strftime('%Y-%m-%d')
+    hasta_str = hasta_str or hoy_local.strftime('%Y-%m-%d')
+    
+    # Convertimos strings a datetime (naive)
+    desde_dt = datetime.strptime(desde_str, '%Y-%m-%d')
+    hasta_dt = datetime.strptime(hasta_str, '%Y-%m-%d')
+    
+    # Localizamos a Ecuador (00:00:00 y 23:59:59)
+    desde_loc = ZONA_HORARIA_LOCAL.localize(datetime(desde_dt.year, desde_dt.month, desde_dt.day, 0, 0, 0))
+    hasta_loc = ZONA_HORARIA_LOCAL.localize(datetime(hasta_dt.year, hasta_dt.month, hasta_dt.day, 23, 59, 59))
+    
+    # Convertimos a UTC para la base de datos
+    desde_utc = desde_loc.astimezone(pytz.utc).replace(tzinfo=None)
+    hasta_utc = hasta_loc.astimezone(pytz.utc).replace(tzinfo=None)
+    
+    return desde_utc, hasta_utc
+
 
 
 def _obtener_ventas_rango(desde_str, hasta_str):
