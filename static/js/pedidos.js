@@ -253,29 +253,37 @@ function renderizarProductos(productos) {
 
     productos.forEach((p) => {
         const col = document.createElement('div');
-        col.className = 'col-6 col-md-4';
+        col.className = 'col-6 col-md-4 col-lg-3'; // 4 columnas en desktop
 
         const tieneSabores = (p.sabores || []).length > 0;
         const img = p.imagen_url
-            ? `<img src="${p.imagen_url}" alt="${p.nombre}" style="width:52px;height:52px;object-fit:cover;border-radius:10px;">`
-            : '<div class="fs-3">&#127846;</div>';
+            ? `<img src="${p.imagen_url}" alt="${p.nombre}">`
+            : `<div class="d-flex align-items-center justify-content-center bg-light" style="width:100%; aspect-ratio:1/1; border-radius:12px 12px 0 0;">
+                 <i data-lucide="ice-cream" class="text-rosa" style="width: 32px; height: 32px;"></i>
+               </div>`;
 
-        // Escapamos las comillas simples del nombre para evitar errores en el atributo onclick.
         const nombreSeguro = p.nombre.replace(/'/g, "\\'");
 
         col.innerHTML = `
-            <div class="card producto-card ${!p.disponible ? 'agotado' : ''}"
+            <div class="producto-card ${!p.disponible ? 'agotado' : ''}"
                  onclick="${p.disponible ? `handleProductoTap(this, ${p.id}, '${nombreSeguro}', ${p.precio})` : ''}">
-                <div class="card-body text-center p-2">
-                    ${img}
-                    <p class="fw-bold mb-1 small">${p.nombre}</p>
-                    ${tieneSabores ? '<small class="text-muted d-block">Con sabores</small>' : '<small class="text-muted d-block">Sabor fijo</small>'}
-                    <span class="badge bg-dark">$${p.precio.toFixed(2)}</span>
-                    ${!p.disponible ? '<br><small class="text-danger">Agotado</small>' : ''}
+                ${img}
+                <div class="card-body">
+                    <div>
+                        <div class="titulo">${p.nombre}</div>
+                        <small class="text-muted" style="font-size: 0.7rem;">${tieneSabores ? 'Sabor personalizable' : 'Sabor estándar'}</small>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                        <span class="precio">$${p.precio.toFixed(2)}</span>
+                        ${!p.disponible ? '<span class="badge bg-danger">Agotado</span>' : '<span class="badge bg-menta-light text-menta-dark">+</span>'}
+                    </div>
                 </div>
             </div>`;
         contenedor.appendChild(col);
     });
+
+    // Inicializamos iconos si se agregaron nuevos placeholders
+    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 
@@ -674,20 +682,23 @@ function actualizarResumen() {
         }
 
         const html = `
-            <div>
-                <span class="fw-bold small">${item.nombre}</span>
-                ${badgeSabor}
-                <br>
-                <small class="text-muted">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${avisoDelivery}</small>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-1">
+                   <span class="fw-800 small text-dark">${item.nombre}</span>
+                   ${badgeSabor}
+                </div>
+                <small class="text-muted" style="font-size: 0.75rem;">$${precioUnitario.toFixed(2)} x ${item.cantidad} ${avisoDelivery}</small>
             </div>
-            <div class="d-flex align-items-center gap-2">
-                <button class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-color: #e5e7eb;" onclick="editarObservacion(${item.producto_id}, ${parametroClick})" title="Anadir Observacion">
-                    <i class="bi bi-pencil text-muted"></i>
-                </button>
-                <span class="text-success fw-bold small">$${subtotal.toFixed(2)}</span>
-                <button class="btn btn-sm btn-outline-danger py-0" onclick="quitarProducto(${item.producto_id}, ${parametroClick})">
-                    <i class="bi bi-dash"></i>
-                </button>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-dark fw-800 small">$${subtotal.toFixed(2)}</span>
+                <div class="d-flex align-items-center bg-light rounded-pill p-1">
+                    <button class="btn btn-sm btn-white shadow-sm p-1 rounded-circle" onclick="editarObservacion(${item.producto_id}, ${parametroClick})" style="width: 28px; height: 28px; background: white;">
+                        <i class="bi bi-pencil" style="font-size: 0.7rem;"></i>
+                    </button>
+                    <button class="btn btn-sm btn-white shadow-sm p-1 rounded-circle ms-1" onclick="quitarProducto(${item.producto_id}, ${parametroClick})" style="width: 28px; height: 28px; background: white;">
+                        <i class="bi bi-dash" style="font-size: 0.8rem;"></i>
+                    </button>
+                </div>
             </div>`;
 
         // Agregamos el HTML a escritorio si existe
@@ -823,11 +834,8 @@ function setTipo(tipo) {
     const total = calcularTotalActual();
     actualizarCheckoutTotal(total);
 
-    // Actualizamos las clases de los botones para indicar cual esta activo.
-    const btnLocal    = document.getElementById('btn-local');
-    const btnDelivery = document.getElementById('btn-delivery');
-    if (btnLocal)    btnLocal.className    = `btn btn-sm flex-fill ${tipo === 'local'    ? 'btn-dark' : 'btn-outline-dark'}`;
-    if (btnDelivery) btnDelivery.className = `btn btn-sm flex-fill ${tipo === 'delivery' ? 'btn-dark' : 'btn-outline-dark'}`;
+    // Los botones de tipo ahora son radio buttons (tipo-local, tipo-delivery).
+    // Bootstrap se encarga de la clase activa con .btn-check y .btn-outline-dark.
 }
 
 /**
@@ -856,17 +864,9 @@ function setFormaPago(forma) {
     contenedorExtra.style.display = 'block';
 
     if (forma === 'efectivo') {
-        compComprobante.style.display = 'none';
-        compMixto.style.display       = 'none';
-        if (compEfectivo) compEfectivo.style.display = 'flex';
+        if (compEfectivo) compEfectivo.style.display = 'block';
         calcularCambioEfectivo();
-    } else if (forma === 'transferencia') {
-        compComprobante.style.display = 'block';
-        compMixto.style.display       = 'none';
-        if (compEfectivo) compEfectivo.style.display = 'none';
     } else {
-        // Mixto: efectivo + transferencia.
-        compMixto.style.display       = 'flex';
         if (compEfectivo) compEfectivo.style.display = 'none';
     }
 }
@@ -903,14 +903,14 @@ function calcularCambioEfectivo() {
 
     const inputRecibido = document.getElementById('monto-recibido');
     const recibido      = parseFloat(inputRecibido?.value) || 0;
-    const cambioInput   = document.getElementById('monto-cambio');
+    const cambioDisplay = document.getElementById('display-cambio');
 
-    if (!cambioInput) return;
+    if (!cambioDisplay) return;
 
     // Si el campo esta vacio, limpiamos el cambio.
     if (recibido === 0 || inputRecibido.value === '') {
-        cambioInput.value = '';
-        cambioInput.classList.replace('text-danger', 'text-success');
+        cambioDisplay.textContent = '$0.00';
+        cambioDisplay.className = 'h3 fw-800 text-menta-dark';
         return;
     }
 
@@ -918,12 +918,11 @@ function calcularCambioEfectivo() {
     const recibidoRounded = parseFloat(recibido.toFixed(2));
     const cambio = recibidoRounded - subTotalRounded;
     if (cambio >= 0) {
-        cambioInput.value = cambio.toFixed(2);
-        cambioInput.classList.replace('text-danger', 'text-success');
+        cambioDisplay.textContent = '$' + cambio.toFixed(2);
+        cambioDisplay.className = 'h3 fw-800 text-success';
     } else {
-        // Math.abs() calcula el valor absoluto (elimina el signo negativo).
-        cambioInput.value = 'Faltan $' + Math.abs(cambio).toFixed(2);
-        cambioInput.classList.replace('text-success', 'text-danger');
+        cambioDisplay.textContent = 'Faltan $' + Math.abs(cambio).toFixed(2);
+        cambioDisplay.className = 'h3 fw-800 text-danger';
     }
 }
 
@@ -949,8 +948,11 @@ function limpiarPedido() {
     
     const mr = document.getElementById('monto-recibido');
     if (mr) mr.value = '';
-    const mc = document.getElementById('monto-cambio');
-    if (mc) mc.value = '';
+    const dc = document.getElementById('display-cambio');
+    if (dc) {
+        dc.textContent = '$0.00';
+        dc.className = 'h3 fw-800 text-menta-dark';
+    }
     document.getElementById('validacion-montos').style.display = 'none';
 
     setTipo('local');
