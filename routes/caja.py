@@ -9,7 +9,7 @@ Tuve que buscar en foros como filtrar por fechas en sqlite porque no salia.
 from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from models.models import db, Caja, Egreso, Venta
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import pytz
 
 # Zona horaria de Ecuador (mismo estandar que ventas.py y reportes.py)
