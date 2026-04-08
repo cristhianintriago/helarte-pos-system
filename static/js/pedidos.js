@@ -253,20 +253,23 @@ function renderizarProductos(productos) {
 
     productos.forEach((p) => {
         const col = document.createElement('div');
-        col.className = 'col-6 col-md-4 col-lg-3'; // 4 columnas en desktop
+        col.className = 'col-6 col-md-4 col-lg-3';
 
         const tieneSabores = (p.sabores || []).length > 0;
+
+        // Usamos Bootstrap Icon (CSS puro) para el placeholder para evitar conflictos
+        // con lucide.createIcons() que puede alterar el DOM y romper los onclick handlers.
         const img = p.imagen_url
             ? `<img src="${p.imagen_url}" alt="${p.nombre}">`
-            : `<div class="d-flex align-items-center justify-content-center bg-light" style="width:100%; aspect-ratio:1/1; border-radius:12px 12px 0 0;">
-                 <i data-lucide="ice-cream" class="text-rosa" style="width: 32px; height: 32px;"></i>
+            : `<div class="producto-card__placeholder">
+                 <i class="bi bi-cup-straw"></i>
                </div>`;
 
         const nombreSeguro = p.nombre.replace(/'/g, "\\'");
 
         col.innerHTML = `
             <div class="producto-card ${!p.disponible ? 'agotado' : ''}"
-                 onclick="${p.disponible ? `handleProductoTap(this, ${p.id}, '${nombreSeguro}', ${p.precio})` : ''}">
+                 onclick="${p.disponible ? `agregarProducto(${p.id}, '${nombreSeguro}', ${p.precio}, this)` : ''}">
                 ${img}
                 <div class="card-body">
                     <div>
@@ -275,15 +278,12 @@ function renderizarProductos(productos) {
                     </div>
                     <div class="d-flex justify-content-between align-items-center mt-2">
                         <span class="precio">$${p.precio.toFixed(2)}</span>
-                        ${!p.disponible ? '<span class="badge bg-danger">Agotado</span>' : '<span class="badge bg-menta-light text-menta-dark">+</span>'}
+                        ${!p.disponible ? '<span class="badge bg-danger">Agotado</span>' : '<span class="badge" style="background:var(--menta-light);color:var(--menta-dark);">+</span>'}
                     </div>
                 </div>
             </div>`;
         contenedor.appendChild(col);
     });
-
-    // Inicializamos iconos si se agregaron nuevos placeholders
-    if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 
@@ -292,15 +292,9 @@ function renderizarProductos(productos) {
 // ==========================================
 
 /**
- * Detecta si el usuario hizo un tap simple o doble sobre una tarjeta de producto.
- * El tap simple abre el modal de seleccion de sabores (flujo normal).
- * El double-tap agrega el producto directamente con los primeros sabores sugeridos (modo rapido).
- *
- * Funcionamiento del detector:
- * 1. Al primer tap, se guarda un temporizador en tapTimers con setTimeout.
- * 2. Si en menos de TAP_DELAY_MS llega un segundo tap, se cancela el temporizador
- *    y se ejecuta el modo rapido.
- * 3. Si no llega segundo tap, el temporizador se cumple y ejecuta el modo normal.
+ * Manejador de tap para compatibilidad (llama directamente a agregarProducto).
+ * El sistema de doble-tap fue eliminado porque causaba latencia perceptible
+ * y confusion al requerir multiples clics para registrar la accion.
  *
  * @param {HTMLElement} cardElement - La tarjeta DOM que recibio el tap.
  * @param {number}      id          - ID del producto.
@@ -308,24 +302,7 @@ function renderizarProductos(productos) {
  * @param {number}      precio      - Precio unitario del producto.
  */
 function handleProductoTap(cardElement, id, nombre, precio) {
-    const key   = `${id}`;
-    const timer = tapTimers.get(key);
-
-    if (timer) {
-        // Ya habia un tap previo dentro del tiempo de espera: es un doble tap.
-        clearTimeout(timer);
-        tapTimers.delete(key);
-        agregarRapido(id, nombre, precio, cardElement);
-        return;
-    }
-
-    // Primer tap: iniciamos el temporizador y esperamos un posible segundo tap.
-    const newTimer = setTimeout(() => {
-        tapTimers.delete(key);
-        agregarProducto(id, nombre, precio, cardElement);
-    }, TAP_DELAY_MS);
-
-    tapTimers.set(key, newTimer);
+    agregarProducto(id, nombre, precio, cardElement);
 }
 
 
