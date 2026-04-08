@@ -237,21 +237,21 @@ def generar_pdf_fecha(fecha):
     elementos.append(Spacer(1, 0.22 * inch))
 
     # RESUMEN GENERAL
-    elementos.append(Paragraph("📊 Resumen General", encabezado_style))
-    
+    elementos.append(Paragraph("Resumen General", encabezado_style))
+
     total_vendido = sum(v.total for v in ventas)
     ticket_promedio = total_vendido / len(ventas) if ventas else 0
-    
+
     datos_resumen = [
         ['Concepto', 'Valor'],
         ['Total Vendido', f'${total_vendido:.2f}'],
-        ['Número de Ventas', str(len(ventas))],
+        ['Numero de Ventas', str(len(ventas))],
         ['Pedidos Local', str(pedidos_local)],
         ['Pedidos Delivery', str(pedidos_delivery)],
         ['Ticket Promedio', f'${ticket_promedio:.2f}'],
         ['Producto Top', top_producto.nombre if top_producto else 'N/A']
     ]
-    
+
     tabla_resumen = Table(datos_resumen, colWidths=[3.5*inch, 2.5*inch])
     tabla_resumen.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
@@ -270,8 +270,8 @@ def generar_pdf_fecha(fecha):
     elementos.append(Spacer(1, 0.3*inch))
 
     # DETALLE DE CAJA
-    elementos.append(Paragraph("💰 Detalle de Caja", encabezado_style))
-    
+    elementos.append(Paragraph("Detalle de Caja", encabezado_style))
+
     datos_caja = [
         ['Concepto', 'Monto'],
         ['Monto Inicial', f'${caja.monto_inicial:.2f}'],
@@ -282,7 +282,7 @@ def generar_pdf_fecha(fecha):
         ['Balance Actual', f'${(caja.monto_inicial + caja.total_ingresos - caja.total_egresos):.2f}'],
         ['Estado Caja', caja.estado.upper()],
     ]
-    
+
     tabla_caja = Table(datos_caja, colWidths=[3.5*inch, 2.5*inch])
     tabla_caja.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
@@ -301,7 +301,7 @@ def generar_pdf_fecha(fecha):
     elementos.append(Spacer(1, 0.3*inch))
 
     # DESGLOSE POR MEDIO DE PAGO
-    elementos.append(Paragraph("💳 Desglose por Forma de Pago", encabezado_style))
+    elementos.append(Paragraph("Desglose por Forma de Pago", encabezado_style))
     datos_pago = [
         ['Forma de pago', 'Monto'],
         ['Efectivo', f'${float(caja.total_efectivo or 0):.2f}'],
@@ -322,7 +322,7 @@ def generar_pdf_fecha(fecha):
     elementos.append(Spacer(1, 0.22 * inch))
 
     if top_productos:
-        elementos.append(Paragraph("🏆 Top 5 Productos del Día", encabezado_style))
+        elementos.append(Paragraph("Top 5 Productos del Dia", encabezado_style))
         datos_top = [['Producto', 'Unidades vendidas']]
         for item in top_productos:
             datos_top.append([item.nombre, str(int(item.cantidad))])
@@ -342,12 +342,12 @@ def generar_pdf_fecha(fecha):
 
     # DETALLE DE EGRESOS
     if egresos:
-        elementos.append(Paragraph("📝 Detalle de Egresos", encabezado_style))
-        
-        datos_egresos = [['Descripción', 'Monto']]
+        elementos.append(Paragraph("Detalle de Egresos", encabezado_style))
+
+        datos_egresos = [['Descripcion', 'Monto']]
         for egreso in egresos:
             datos_egresos.append([egreso.descripcion, f'${egreso.monto:.2f}'])
-        
+
         tabla_egresos = Table(datos_egresos, colWidths=[4*inch, 2*inch])
         tabla_egresos.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
@@ -365,23 +365,23 @@ def generar_pdf_fecha(fecha):
         elementos.append(tabla_egresos)
         elementos.append(Spacer(1, 0.3*inch))
 
-    # COMPARACIÓN CON DÍA ANTERIOR
+    # COMPARACION CON DIA ANTERIOR
     if caja_anterior:
-        elementos.append(Paragraph("📈 Comparación con Día Anterior", encabezado_style))
-        
+        elementos.append(Paragraph("Comparacion con Dia Anterior", encabezado_style))
+
         diferencia = total_vendido - caja_anterior.total_ingresos
         porcentaje = (diferencia / caja_anterior.total_ingresos * 100) if caja_anterior.total_ingresos > 0 else 0
-        tendencia = "↗️ Mejor" if diferencia > 0 else "↘️ Menor" if diferencia < 0 else "→ Igual"
-        
+        tendencia = "Mejor" if diferencia > 0 else "Menor" if diferencia < 0 else "Igual"
+
         datos_comparacion = [
             ['Concepto', 'Valor'],
-            ['Ventas Día Anterior', f'${caja_anterior.total_ingresos:.2f}'],
+            ['Ventas Dia Anterior', f'${caja_anterior.total_ingresos:.2f}'],
             ['Ventas Hoy', f'${total_vendido:.2f}'],
             ['Diferencia', f'${abs(diferencia):.2f}'],
             ['Porcentaje', f'{abs(porcentaje):.1f}%'],
             ['Tendencia', tendencia]
         ]
-        
+
         tabla_comparacion = Table(datos_comparacion, colWidths=[3.5*inch, 2.5*inch])
         tabla_comparacion.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
@@ -398,7 +398,8 @@ def generar_pdf_fecha(fecha):
         ]))
         elementos.append(tabla_comparacion)
 
-    elementos.append(Paragraph('Helarte · Reporte automático de cierre diario', foot_style))
+    elementos.append(Paragraph('Helarte - Reporte automatico de cierre diario', foot_style))
+
 
     # Construir PDF
     doc.build(elementos)
