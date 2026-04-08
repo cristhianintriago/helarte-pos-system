@@ -483,6 +483,14 @@ function abrirModalSabor(item) {
      */
     window.toggleSaborFeedback = function(input) {
         if (navigator.vibrate) navigator.vibrate(15);
+
+        // Fallback para browsers sin CSS :has() - añadir/quitar clase .seleccionado
+        const allOpciones = document.querySelectorAll('#selector-sabor-pedido .sabor-opcion');
+        allOpciones.forEach(opcion => {
+            const inp = opcion.querySelector('input');
+            opcion.classList.toggle('seleccionado', inp && inp.checked);
+        });
+
         if (itemPendienteSabor && itemPendienteSabor.maxSabores === 1) {
             // Con radio buttons, confirmamos automaticamente tras un pequeno delay para mejor UX.
             setTimeout(confirmarSaborSeleccionado, 150);
