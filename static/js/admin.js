@@ -67,10 +67,10 @@ async function cargarCajas() {
         <tr>
             <td><input type="checkbox" class="check-caja" value="${c.id}"></td>
             <td class="fw-bold">${c.fecha}</td>
-            <td>$${c.monto_inicial.toFixed(2)}</td>
-            <td class="text-success fw-bold">+$${c.total_ingresos.toFixed(2)}</td>
-            <td class="text-danger fw-bold">-$${c.total_egresos.toFixed(2)}</td>
-            <td class="text-primary fw-bold">$${c.monto_final.toFixed(2)}</td>
+            <td>$${(c.monto_inicial || 0).toFixed(2)}</td>
+            <td class="text-success fw-bold">+$${(c.total_ingresos || 0).toFixed(2)}</td>
+            <td class="text-danger fw-bold">-$${(c.total_egresos || 0).toFixed(2)}</td>
+            <td class="text-primary fw-bold">$${(c.efectivo_esperado || 0).toFixed(2)}</td>
         </tr>`
     ).join('');
 }
