@@ -471,10 +471,10 @@ function abrirModalSabor(item) {
     const regla    = document.getElementById('sabor-producto-regla');
     const selector = document.getElementById('selector-sabor-pedido');
 
-    if (!label || !regla || !selector) return;
+    if (!label || !selector) return;  // regla es opcional
 
     label.textContent = `Selecciona sabor para ${item.nombre}`;
-    regla.textContent = `Puedes elegir hasta ${item.maxSabores} sabor(es).`;
+    if (regla) regla.textContent = `Puedes elegir hasta ${item.maxSabores} sabor(es).`;
 
     /**
      * Callback que se ejecuta cuando el usuario selecciona o deselecciona un sabor.
