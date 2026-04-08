@@ -9,8 +9,8 @@
       <input type="text" id="buscador-carta" class="form-control" placeholder="Buscar por producto, categoria o sabor" />
     </div>
 
-    <div id="filtros" class="mb-3 d-flex flex-wrap gap-2">
-      <button class="btn btn-sm btn-dark filtro-btn activo" onclick="filtrarCategoria('todas', event)">
+    <div id="filtros" class="mb-4 d-flex flex-wrap gap-2 pb-2" style="overflow-x: auto; white-space: nowrap; scrollbar-width: none;">
+      <button class="btn btn-sm btn-dark filtro-btn activo rounded-pill px-4" onclick="filtrarCategoria('todas', event)">
         Todas
       </button>
     </div>
@@ -19,28 +19,31 @@
   </div>
 
   <div class="col-lg-6">
-    <div id="card-nuevo-pedido" class="card shadow-sm mb-4 pedido-sticky" style="top: 80px; z-index: 100;">
-      <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-        <h5 class="mb-0"><i class="bi bi-receipt"></i> Pedido #<span id="numero-pedido-actual">1</span></h5>
-        <span class="badge bg-light text-dark">Paso 1 de 2</span>
+    <div id="card-nuevo-pedido" class="card shadow-lg mb-4 pedido-sticky border-0" style="top: 100px; z-index: 100; background: var(--glass); backdrop-filter: blur(var(--blur));">
+      <div class="card-header border-0 d-flex justify-content-between align-items-center p-4">
+        <h5 class="fw-800 mb-0"><i data-lucide="shopping-cart" class="text-rosa"></i> Pedido #<span id="numero-pedido-actual">1</span></h5>
+        <span class="badge bg-menta-light text-menta-dark rounded-pill px-3">Paso 1 de 2</span>
       </div>
-      <div class="card-body">
-        <label class="form-label fw-bold small">Productos en el pedido</label>
-        <div id="items-pedido" class="list-group list-group-flush" style="max-height: 310px; overflow-y: auto;">
-          <p class="text-muted small" id="pedido-vacio">No hay productos aun</p>
+      <div class="card-body p-4 pt-0">
+        <label class="form-label fw-800 small text-texto-sec text-uppercase letter-spacing-1 mb-3">Tu Selección</label>
+        <div id="items-pedido" class="list-group list-group-flush mb-4" style="max-height: 400px; overflow-y: auto;">
+          <div class="text-center py-5" id="pedido-vacio">
+            <i data-lucide="package-open" class="text-muted mb-2" style="width: 48px; height: 48px;"></i>
+            <p class="text-muted small">El pedido está vacío</p>
+          </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mt-3 mb-3">
-          <span class="fw-bold fs-5">Total:</span>
-          <span id="total-pedido" class="fw-bold text-success" style="font-size: 1.8rem; letter-spacing: -1px;">$0.00</span>
+        <div class="d-flex justify-content-between align-items-end mb-4">
+          <span class="fw-bold text-texto-sec">Total a Pagar:</span>
+          <span id="total-pedido" class="fw-800 text-success" style="font-size: 2.2rem; line-height: 1; letter-spacing: -1.5px;">$0.00</span>
         </div>
 
-        <div class="d-flex gap-2 d-none d-md-flex">
-          <button class="btn btn-outline-danger py-2 fw-bold flex-fill" onclick="limpiarPedido()">
-            <i class="bi bi-trash"></i> Limpiar
+        <div class="d-flex gap-3 d-none d-md-flex">
+          <button class="btn btn-outline-danger py-3 fw-bold flex-fill bg-white border" onclick="limpiarPedido()">
+            <i data-lucide="trash-2" style="width: 18px; height: 18px;"></i> Limpiar
           </button>
-          <button id="btn-continuar-desktop" class="btn btn-success py-2 fw-bold fs-5 flex-fill" onclick="abrirCheckout()" style="box-shadow: 0 4px 15px rgba(22, 163, 74, 0.4);">
-            <i class="bi bi-arrow-right-circle"></i> Continuar
+          <button id="btn-continuar-desktop" class="btn btn-success py-3 fw-800 fs-5 flex-fill shadow-success" onclick="abrirCheckout()">
+            Cobrar <i data-lucide="chevron-right" style="width: 20px; height: 20px;"></i>
           </button>
         </div>
       </div>
@@ -68,19 +71,15 @@
 <div class="mobile-action-bar d-md-none">
   <div class="mobile-action-content">
     <div class="mobile-total-box" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-carrito" aria-controls="offcanvas-carrito" style="cursor: pointer;">
-      <small class="text-muted d-block">Total pedido <i class="bi bi-chevron-up"></i></small>
-      <strong id="total-pedido-mobile" class="text-success">$0.00</strong>
-      <small id="items-pedido-mobile" class="text-muted d-block">0 items</small>
+      <small class="text-texto-sec d-block fw-bold" style="font-size: 0.65rem; text-transform: uppercase;">Total Pedido</small>
+      <strong id="total-pedido-mobile" class="text-success fs-4 fw-800">$0.00</strong>
     </div>
     <div class="d-flex gap-2 mobile-action-buttons">
-      <button class="btn btn-outline-dark btn-sm" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-pedidos-activos" aria-controls="offcanvas-pedidos-activos">
-        <i class="bi bi-clock-history"></i>
+      <button class="btn btn-light shadow-sm rounded-circle p-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvas-pedidos-activos">
+        <i data-lucide="clock" class="text-dark" style="width: 20px; height: 20px;"></i>
       </button>
-      <button class="btn btn-outline-danger btn-sm" onclick="limpiarPedido()">
-        <i class="bi bi-trash"></i>
-      </button>
-      <button id="btn-continuar-mobile" class="btn btn-success btn-sm flex-fill" onclick="abrirCheckout()">
-        <i class="bi bi-arrow-right-circle"></i> Continuar
+      <button id="btn-continuar-mobile" class="btn btn-success px-4 fw-800 shadow-success" onclick="abrirCheckout()">
+        Continuar <i data-lucide="arrow-right" style="width: 18px; height: 18px;"></i>
       </button>
     </div>
   </div>
@@ -120,144 +119,97 @@
 
 <div class="modal fade" id="modal-sabor" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-dark text-white">
-        <h5 class="modal-title"><i class="bi bi-stars"></i> Elegir sabor</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 24px !important;">
+      <div class="modal-header border-0 p-4 pb-0">
+        <h5 class="modal-title fw-800"><i data-lucide="sparkles" class="text-rosa"></i> Personaliza tu Helado</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
-        <p class="mb-2" id="sabor-producto-label"></p>
-        <p class="small text-muted mb-2" id="sabor-producto-regla"></p>
+      <div class="modal-body p-4">
+        <p class="mb-3 fw-bold" id="sabor-producto-label" style="font-size: 1.1rem;"></p>
         <div id="selector-sabor-pedido" class="sabor-selector-lista"></div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-        <button class="btn btn-dark" onclick="confirmarSaborSeleccionado()">Agregar al pedido</button>
+      <div class="modal-footer border-0 p-4 pt-0">
+        <button class="btn btn-light fw-bold px-4 rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+        <button class="btn btn-dark fw-bold px-4 rounded-pill" onclick="confirmarSaborSeleccionado()">Confirmar Selección</button>
       </div>
     </div>
   </div>
 </div>
 
 <div class="modal fade" id="modal-checkout" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header bg-dark text-white">
-        <h5 class="modal-title"><i class="bi bi-check2-circle"></i> Confirmar pedido</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 24px !important;">
+      <div class="modal-header border-0 p-4 pb-0">
+        <h5 class="modal-title fw-800"><i data-lucide="check-circle" class="text-success"></i> Finalizar Venta</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body">
-        <div class="alert alert-light border mb-3 d-flex justify-content-between align-items-center">
-          <span class="fw-bold">Pedido #<span id="numero-pedido-checkout">1</span></span>
-          <div class="text-end">
-             <span id="badge-iva-checkout" class="badge bg-warning text-dark me-2" style="display: none;">+15% IVA SRI</span>
-             <span class="fw-bold text-success" id="checkout-total">$0.00</span>
-          </div>
-        </div>
-
-        <div class="mb-2">
-          <label class="form-label fw-bold small text-muted">Tipo de Pedido</label>
-          <div class="d-flex gap-2">
-            <button id="btn-local" class="btn btn-dark py-2 fs-6 flex-fill fw-bold" onclick="setTipo('local')">
-              <i class="bi bi-shop"></i> Local
-            </button>
-            <button id="btn-delivery" class="btn btn-outline-dark py-2 fs-6 flex-fill fw-bold" onclick="setTipo('delivery')">
-              <i class="bi bi-bicycle"></i> Delivery
-            </button>
-          </div>
-        </div>
-
-        <div class="mb-2">
-          <label class="form-label fw-bold small text-muted">Datos de Facturaci&oacute;n</label>
-          <!-- TODO(SRI): Remover el style="display: none !important;" de abajo cuando se consiga la firma electrónica para habilitar el SRI de nuevo -->
-          <div class="d-flex gap-2 mb-2" style="display: none !important;">
-            <button id="btn-consfinal" class="btn btn-dark py-2 fs-6 flex-fill fw-bold" onclick="setFacturacion(false)">
-              Consumidor Final
-            </button>
-            <button id="btn-sri" class="btn btn-outline-dark py-2 fs-6 flex-fill fw-bold" onclick="setFacturacion(true)">
-              Factura Oficial (SRI)
-            </button>
-          </div>
-          
-          <!-- Datos Consumidor Final (default o sin factura oficial) -->
-          <div id="datos-consfinal" style="display: block;">
-              <input type="text" id="cliente-nombre" class="form-control mb-1" placeholder="Nombre cliente (ej. Juan)" value="Consumidor final" />
-              <input type="text" id="cliente-direccion-basica" class="form-control mb-1" placeholder="Direcci&oacute;n (opcional)" />
-              <input type="tel" id="cliente-telefono-basico" class="form-control" placeholder="Tel&eacute;fono (opcional)" />
-          </div>
-
-          <!-- Datos Facturacion Electronica SRI -->
-          <div id="datos-sri" class="bg-light p-2 border rounded" style="display: none;">
-              <input type="text" id="cliente-identificacion" class="form-control mb-1" placeholder="RUC o C&eacute;dula *" />
-              <input type="text" id="cliente-razon-social" class="form-control mb-1" placeholder="Nombres o Raz&oacute;n Social *" />
-              <input type="email" id="cliente-correo" class="form-control mb-1" placeholder="Correo Electr&oacute;nico *" />
-              <input type="text" id="cliente-direccion-sri" class="form-control mb-1" placeholder="Direcci&oacute;n completa *" />
-              <input type="tel" id="cliente-telefono-sri" class="form-control" placeholder="Tel&eacute;fono *" />
-          </div>
-        </div>
-
-        <div class="mb-2">
-          <label class="form-label fw-bold small text-muted">Forma de Pago</label>
-          <div class="d-flex gap-2 flex-wrap">
-            <button id="btn-efectivo" class="btn btn-dark py-3 fs-6 flex-fill fw-bold rounded-4" onclick="setFormaPago('efectivo')">Efectivo</button>
-            <button id="btn-transferencia" class="btn btn-outline-dark py-3 fs-6 flex-fill fw-bold rounded-4" onclick="setFormaPago('transferencia')">Transferencia</button>
-            <button id="btn-mixto" class="btn btn-outline-dark py-3 fs-6 flex-fill fw-bold rounded-4" onclick="setFormaPago('mixto')">Mixto</button>
-          </div>
-
-          <div id="campos-pago-extra" class="mt-2 p-2 bg-light rounded border" style="display: none;">
-            <div id="campos-efectivo" class="row g-2 mb-2" style="display: none;">
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted mb-1">Monto Recibido</label>
-                <div class="input-group">
-                  <span class="input-group-text">$</span>
-                  <input type="number" id="monto-recibido" oninput="calcularCambioEfectivo()" class="form-control" step="0.01" min="0" placeholder="0.00">
+      <div class="modal-body p-4">
+        <div class="row g-4">
+            <div class="col-md-6 border-end">
+                <div class="p-3 rounded-4 bg-light mb-4">
+                   <div class="d-flex justify-content-between align-items-center">
+                       <span class="text-texto-sec small fw-bold">PEDIDO #<span id="numero-pedido-checkout">1</span></span>
+                       <span id="badge-iva-checkout" class="badge bg-warning text-dark" style="display: none;">+15% IVA</span>
+                   </div>
+                   <div class="mt-2">
+                       <h1 class="fw-800 text-success mb-0" id="checkout-total" style="font-size: 2.5rem; letter-spacing: -2px;">$0.00</h1>
+                   </div>
                 </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label fw-bold small text-muted mb-1">Cambio a Devolver</label>
-                <div class="input-group">
-                  <span class="input-group-text">$</span>
-                  <input type="text" id="monto-cambio" class="form-control text-success fw-bold" readonly placeholder="0.00">
+
+                <div class="mb-4">
+                  <label class="form-label fw-800 small text-uppercase letter-spacing-1 mb-3">Tipo de Entrega</label>
+                  <div class="d-flex gap-2">
+                    <input type="radio" class="btn-check" name="tipo-pedido" id="tipo-local" autocomplete="off" checked onclick="setTipo('local')">
+                    <label class="btn btn-outline-dark flex-fill fw-bold py-2" for="tipo-local"><i data-lucide="home" style="width: 16px;"></i> Local</label>
+                    <input type="radio" class="btn-check" name="tipo-pedido" id="tipo-delivery" autocomplete="off" onclick="setTipo('delivery')">
+                    <label class="btn btn-outline-dark flex-fill fw-bold py-2" for="tipo-delivery"><i data-lucide="truck" style="width: 16px;"></i> Delivery</label>
+                  </div>
                 </div>
-              </div>
+
+                <div>
+                  <label class="form-label fw-800 small text-uppercase letter-spacing-1 mb-3">Resumen de Pago</label>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <button id="btn-efectivo" class="btn btn-dark flex-fill fw-bold py-3" onclick="setFormaPago('efectivo')">Efectivo</button>
+                    <button id="btn-transferencia" class="btn btn-outline-dark flex-fill fw-bold py-3" onclick="setFormaPago('transferencia')">Transf.</button>
+                    <button id="btn-mixto" class="btn btn-outline-dark flex-fill fw-bold py-3" onclick="setFormaPago('mixto')">Mixto</button>
+                  </div>
+                </div>
             </div>
 
-            <div id="campo-comprobante" class="mb-2" style="display: none;">
-              <label class="form-label fw-bold small text-muted mb-1">N Comprobante *</label>
-              <input type="text" id="numero-comprobante" class="form-control" placeholder="Ej: 12345678">
+            <div class="col-md-6">
+                <div id="campos-pago-extra" class="mb-4">
+                    <!-- Dinamico -->
+                    <div id="campos-efectivo" class="animate__animated animate__fadeIn">
+                      <label class="form-label fw-bold small text-muted">Pago con</label>
+                      <div class="input-group mb-3">
+                        <span class="input-group-text bg-white border-end-0">$</span>
+                        <input type="number" id="monto-recibido" oninput="calcularCambioEfectivo()" class="form-control border-start-0 ps-0 fw-bold fs-5" step="0.01" placeholder="0.00">
+                      </div>
+                      <label class="form-label fw-bold small text-muted">Cambio</label>
+                      <div class="h3 fw-800 text-menta-dark" id="display-cambio">$0.00</div>
+                    </div>
+                </div>
+
+                <div class="border-top pt-3">
+                  <label class="form-label fw-800 small text-uppercase letter-spacing-1 mb-2">Datos Facturación</label>
+                  <div id="datos-consfinal">
+                      <input type="text" id="cliente-nombre" class="form-control mb-2" placeholder="Nombre cliente" value="Consumidor final" />
+                      <input type="email" id="cliente-correo" class="form-control" placeholder="Correo (opcional)" />
+                  </div>
+                </div>
             </div>
-            <div id="campos-mixto" class="row g-1" style="display: none;">
-              <div class="col-6">
-                <label class="form-label fw-bold small text-muted mb-1">Efectivo *</label>
-                <div class="input-group">
-                  <span class="input-group-text">$</span>
-                  <input type="number" id="monto-efectivo" class="form-control" step="0.01" min="0" placeholder="0.00">
-                </div>
-              </div>
-              <div class="col-6">
-                <label class="form-label fw-bold small text-muted mb-1">Transferencia *</label>
-                <div class="input-group">
-                  <span class="input-group-text">$</span>
-                  <input type="number" id="monto-transferencia" class="form-control" step="0.01" min="0" placeholder="0.00">
-                </div>
-              </div>
-              <div class="col-12">
-                <div id="validacion-montos" class="small text-danger fw-bold" style="display: none;">
-                  <i class="bi bi-exclamation-triangle"></i> La suma debe coincidir con el total.
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button>
-        <button id="btn-confirmar-final" class="btn btn-success" onclick="confirmarPedido()">
-          <i class="bi bi-check-circle"></i> Confirmar pedido
+      <div class="modal-footer border-0 p-4">
+        <button class="btn btn-light fw-bold px-4 py-3 rounded-pill" data-bs-dismiss="modal">Seguir Vendiendo</button>
+        <button id="btn-confirmar-final" class="btn btn-success fw-800 px-5 py-3 rounded-pill shadow-success" onclick="confirmarPedido()">
+          Confirmar Venta <i data-lucide="check" style="width: 20px;"></i>
         </button>
       </div>
     </div>
   </div>
 </div>
+
 
 {% endblock %}
 {% block scripts %}

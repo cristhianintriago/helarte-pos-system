@@ -15,47 +15,49 @@
  * La funcion flecha '() => {}' es una forma moderna y compacta de definir funciones en JavaScript.
  */
 document.addEventListener('DOMContentLoaded', () => {
+    // Inicializamos los iconos de Lucide al cargar la pagina.
+    lucide.createIcons();
+
     // Cargamos el resumen inmediatamente al entrar al dashboard.
     cargarResumen();
 
     // setInterval ejecuta la funcion cargarResumen cada 30000ms (30 segundos).
-    // Esto mantiene los indicadores del dashboard actualizados sin necesidad de recargar la pagina.
     setInterval(cargarResumen, 30000);
 });
 
-/**
- * Consulta el endpoint /resumen del servidor y actualiza los indicadores del dashboard.
- * Usa async/await para manejar la llamada HTTP de forma asincrona (sin bloquear el navegador).
- *
- * Por que async/await:
- * Las solicitudes de red (fetch) son operaciones lentas. Si el codigo fuera sincronico,
- * el navegador se congelaria esperando la respuesta. async/await permite que el navegador
- * continue respondiendo al usuario mientras espera la respuesta del servidor.
- */
 async function cargarResumen() {
-    // fetch() realiza una solicitud HTTP GET al endpoint /resumen.
-    // await detiene la ejecucion de esta funcion hasta que llegue la respuesta,
-    // pero NO bloquea el resto del navegador.
-    const respuesta = await fetch('/resumen');
+    try {
+        const respuesta = await fetch('/resumen');
+        const datos = await respuesta.json();
 
-    // .json() convierte el cuerpo de la respuesta de texto JSON a un objeto JavaScript.
-    const datos = await respuesta.json();
+        // Actualizamos el contenido de cada indicador.
+        document.getElementById('pedidos-activos').textContent = datos.pedidos_activos;
+        document.getElementById('total-ventas').textContent = datos.total_ventas;
+        document.getElementById('total-vendido').textContent = `$${datos.total_vendido.toFixed(2)}`;
 
-    // Actualizamos el contenido de cada indicador con los datos recibidos del servidor.
-    document.getElementById('pedidos-activos').textContent = datos.pedidos_activos;
-    document.getElementById('total-ventas').textContent = datos.total_ventas;
+        const estadoCaja = document.getElementById('estado-caja');
+        const cajaCard = document.getElementById('caja-card-bg');
+        const cajaIconWrapper = document.getElementById('caja-icono-wrapper');
+        const cajaIcon = document.getElementById('caja-lucide-icon');
 
-    // toFixed(2) formatea el numero con exactamente 2 decimales. Ej: 120.5 -> "120.50"
-    document.getElementById('total-vendido').textContent = `$${datos.total_vendido.toFixed(2)}`;
+        if (datos.caja_abierta) {
+            estadoCaja.textContent = 'Abierta';
+            estadoCaja.className = 'fw-800 mb-0 mt-2 text-success';
+            cajaCard.style.background = 'linear-gradient(135deg, #fff 0%, var(--menta-light) 100%)';
+            cajaIconWrapper.className = 'p-3 rounded-4 bg-white shadow-sm text-success';
+            cajaIcon.setAttribute('data-lucide', 'unlock');
+        } else {
+            estadoCaja.textContent = 'Cerrada';
+            estadoCaja.className = 'fw-800 mb-0 mt-2 text-danger';
+            cajaCard.style.background = 'linear-gradient(135deg, #fff 0%, #fee2e2 100%)';
+            cajaIconWrapper.className = 'p-3 rounded-4 bg-white shadow-sm text-danger';
+            cajaIcon.setAttribute('data-lucide', 'lock');
+        }
 
-    // Actualizamos el indicador visual del estado de la caja segun lo que retorno el servidor.
-    if (datos.caja_abierta) {
-        document.getElementById('estado-caja').textContent = 'Abierta ✅';
-        document.getElementById('estado-caja').className = 'fw-bold text-success';
-        document.getElementById('caja-icono').textContent = '🔓';
-    } else {
-        document.getElementById('estado-caja').textContent = 'Cerrada';
-        document.getElementById('estado-caja').className = 'fw-bold text-danger';
-        document.getElementById('caja-icono').textContent = '🔒';
+        // Importante: Refrescamos los iconos de Lucide porque cambiamos atributos data-lucide
+        // o cargamos contenido nuevo dinamicamente.
+        lucide.createIcons();
+    } catch (error) {
+        console.error('Error al cargar resumen:', error);
     }
 }

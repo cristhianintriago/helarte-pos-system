@@ -9,99 +9,87 @@
     </div>
 </div>
 
-<!-- TARJETAS DE RESUMEN -->
-<div class="row g-3 mb-4">
-    <div class="col-6 col-md-3">
-        <div class="card text-center shadow-sm h-100">
-            <div class="card-body">
-                <div class="fs-2">🛒</div>
-                <h6 class="text-muted">Pedidos Activos</h6>
-                <h3 id="pedidos-activos" class="fw-bold text-primary">—</h3>
+<!-- TARJETAS DE RESUMEN (Premium Glass) -->
+<div class="row g-4 mb-5">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #fff 0%, var(--rosa-light) 100%);">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="p-3 rounded-4 bg-white shadow-sm text-rosa">
+                        <i data-lucide="shopping-bag" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h6 class="text-texto-sec fw-bold small text-uppercase letter-spacing-1">Pedidos Activos</h6>
+                <h2 id="pedidos-activos" class="fw-800 mb-0 mt-2">...</h2>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card text-center shadow-sm h-100">
-            <div class="card-body">
-                <div class="fs-2">🧾</div>
-                <h6 class="text-muted">Ventas Hoy</h6>
-                <h3 id="total-ventas" class="fw-bold text-dark">—</h3>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #fff 0%, #f1f5f9 100%);">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="p-3 rounded-4 bg-white shadow-sm text-dark">
+                        <i data-lucide="file-text" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h6 class="text-texto-sec fw-bold small text-uppercase letter-spacing-1">Ventas Hoy</h6>
+                <h2 id="total-ventas" class="fw-800 mb-0 mt-2">...</h2>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card text-center shadow-sm h-100">
-            <div class="card-body">
-                <div class="fs-2">💰</div>
-                <h6 class="text-muted">Total Vendido</h6>
-                <h3 id="total-vendido" class="fw-bold text-success">—</h3>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm" style="background: linear-gradient(135deg, #fff 0%, var(--menta-light) 100%);">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="p-3 rounded-4 bg-white shadow-sm text-success">
+                        <i data-lucide="dollar-sign" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h6 class="text-texto-sec fw-bold small text-uppercase letter-spacing-1">Total Vendido</h6>
+                <h2 id="total-vendido" class="fw-800 mb-0 mt-2 text-success">...</h2>
             </div>
         </div>
     </div>
-    <div class="col-6 col-md-3">
-        <div class="card text-center shadow-sm h-100">
-            <div class="card-body">
-                <div class="fs-2" id="caja-icono">🔒</div>
-                <h6 class="text-muted">Caja</h6>
-                <h3 id="estado-caja" class="fw-bold">—</h3>
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm" id="caja-card-bg">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div class="p-3 rounded-4 bg-white shadow-sm" id="caja-icono-wrapper">
+                        <i id="caja-lucide-icon" data-lucide="lock" style="width: 24px; height: 24px;"></i>
+                    </div>
+                </div>
+                <h6 class="text-texto-sec fw-bold small text-uppercase letter-spacing-1">Estado Caja</h6>
+                <h2 id="estado-caja" class="fw-800 mb-0 mt-2">...</h2>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ACCESOS DIRECTOS -->
+<!-- ACCESOS RÁPIDOS (Grid Moderno) -->
 <div class="row g-3">
-    <div class="col-12">
-        <h6 class="text-muted mb-3"><i class="bi bi-grid"></i> Accesos Rápidos</h6>
+    <div class="col-12 mb-2">
+        <h5 class="fw-800"><i class="bi bi-grid-fill text-rosa me-2"></i> Accesos Rápidos</h5>
     </div>
-    <div class="col-6 col-md-4">
-        <a href="/pedidos" class="card text-center shadow-sm text-decoration-none text-dark h-100">
+    {% set accesos = [
+        {'url': '/pedidos', 'icon': 'clipboard-list', 'label': 'Toma de Pedidos', 'color': 'rosa'},
+        {'url': '/cocina', 'icon': 'monitor', 'label': 'Pantalla Cocina', 'color': 'menta'},
+        {'url': '/ventas', 'icon': 'history', 'label': 'Historial Ventas', 'color': 'dark'},
+        {'url': '/caja', 'icon': 'wallet', 'label': 'Gestión de Caja', 'color': 'info'},
+        {'url': '/productos', 'icon': 'ice-cream', 'label': 'Catálogo', 'color': 'rosa'},
+        {'url': '/reportes', 'icon': 'bar-chart-3', 'label': 'Reportes', 'color': 'dark'}
+    ] %}
+    {% for acc in accesos %}
+    <div class="col-6 col-md-4 col-lg-2">
+        <a href="{{ acc.url }}" class="card text-center border-0 shadow-sm text-decoration-none h-100 transition-up">
             <div class="card-body py-4">
-                <div class="fs-1">📋</div>
-                <h6 class="mt-2 mb-0">Pedidos</h6>
+                <div class="p-3 rounded-circle mx-auto mb-3" style="width: 60px; height: 60px; background: var(--{{ acc.color }}-light); color: var(--{{ acc.color }});">
+                    <i data-lucide="{{ acc.icon }}" style="width: 28px; height: 28px;"></i>
+                </div>
+                <h6 class="fw-800 small mb-0 text-dark">{{ acc.label }}</h6>
             </div>
         </a>
     </div>
-    <div class="col-6 col-md-4">
-        <a href="/ventas" class="card text-center shadow-sm text-decoration-none text-dark h-100">
-            <div class="card-body py-4">
-                <div class="fs-1">📊</div>
-                <h6 class="mt-2 mb-0">Ventas</h6>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-md-4">
-        <a href="/caja" class="card text-center shadow-sm text-decoration-none text-dark h-100">
-            <div class="card-body py-4">
-                <div class="fs-1">💵</div>
-                <h6 class="mt-2 mb-0">Caja</h6>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-md-4">
-        <a href="/productos" class="card text-center shadow-sm text-decoration-none text-dark h-100">
-            <div class="card-body py-4">
-                <div class="fs-1">🍦</div>
-                <h6 class="mt-2 mb-0">Productos</h6>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-md-4">
-        <a href="/reportes" class="card text-center shadow-sm text-decoration-none text-dark h-100">
-            <div class="card-body py-4">
-                <div class="fs-1">📄</div>
-                <h6 class="mt-2 mb-0">Reportes</h6>
-            </div>
-        </a>
-    </div>
-    <div class="col-6 col-md-4">
-        <a href="/usuarios" class="card text-center shadow-sm text-decoration-none text-dark h-100">
-            <div class="card-body py-4">
-                <div class="fs-1">👥</div>
-                <h6 class="mt-2 mb-0">Usuarios</h6>
-            </div>
-        </a>
-    </div>
+    {% endfor %}
 </div>
 
 {% endblock %}
