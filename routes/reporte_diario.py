@@ -20,6 +20,17 @@ ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
 reporte_diario_bp = Blueprint('reporte_diario', __name__, url_prefix='/reporte-diario')
 
 
+def safe_text(value):
+    """
+    Convierte cualquier valor a string seguro para ReportLab.
+    Reemplaza caracteres fuera del rango Latin-1 (U+00FF) con '?' para evitar
+    excepciones de codificacion al generar el PDF con fuentes estandar.
+    """
+    if value is None:
+        return ''
+    return str(value).encode('latin-1', errors='replace').decode('latin-1')
+
+
 
 @reporte_diario_bp.route('/pdf', methods=['GET'])
 @login_required
@@ -27,19 +38,28 @@ def generar_pdf():
     """Genera PDF del reporte diario para hoy (Hora Ecuador)"""
     ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
     hoy = ahora_local.date()
-    return generar_pdf_fecha(hoy)
+    try:
+        return generar_pdf_fecha(hoy)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error al generar PDF: {str(e)}'}), 500
 
 
 
 @reporte_diario_bp.route('/pdf/<string:fecha>', methods=['GET'])
 @login_required
 def generar_pdf_historico(fecha):
-    """Genera PDF de un día específico (formato: YYYY-MM-DD)"""
+    """Genera PDF de un dia especifico (formato: YYYY-MM-DD)"""
     try:
         fecha_obj = datetime.strptime(fecha, '%Y-%m-%d').date()
         return generar_pdf_fecha(fecha_obj)
     except ValueError:
-        return jsonify({'error': 'Formato de fecha inválido. Use YYYY-MM-DD'}), 400
+        return jsonify({'error': 'Formato de fecha invalido. Use YYYY-MM-DD'}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Error al generar PDF: {str(e)}'}), 500
 
 
 @reporte_diario_bp.route('/historial', methods=['GET'])
@@ -199,19 +219,19 @@ def generar_pdf_fecha(fecha):
         leading=14,
     )
 
-    # Encabezado
-    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'img', 'logo.png')
-    if os.path.exists(logo_path):
-        logo = Image(logo_path, width=0.9 * inch, height=0.9 * inch)
-        logo.hAlign = 'CENTER'
-        elementos.append(logo)
-        elementos.append(Spacer(1, 0.08 * inch))
+    try:
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'img', 'logo.png')
+        if os.path.exists(logo_path):
+            logo = Image(logo_path, width=0.9 * inch, height=0.9 * inch)
+            logo.hAlign = 'CENTER'
+            elementos.append(logo)
+            elementos.append(Spacer(1, 0.08 * inch))
+    except Exception:
+        pass  # Si el logo falla, continuamos sin el
 
-    import pytz
-    tz_local = pytz.timezone('America/Guayaquil')
-    ahora_local = datetime.now(tz_local)
+    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
     
-    elementos.append(Paragraph("Helarte · Reporte de Corte", titulo_style))
+    elementos.append(Paragraph("Helarte - Reporte de Corte", titulo_style))
     elementos.append(Paragraph(
         f"Fecha operativa: {fecha.strftime('%d/%m/%Y')} &nbsp;&nbsp; Corte generado: {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora Ecuador)",
         subtitulo_style
@@ -249,7 +269,7 @@ def generar_pdf_fecha(fecha):
         ['Pedidos Local', str(pedidos_local)],
         ['Pedidos Delivery', str(pedidos_delivery)],
         ['Ticket Promedio', f'${ticket_promedio:.2f}'],
-        ['Producto Top', top_producto.nombre if top_producto else 'N/A']
+        ['Producto Top', safe_text(top_producto.nombre) if top_producto else 'N/A']
     ]
 
     tabla_resumen = Table(datos_resumen, colWidths=[3.5*inch, 2.5*inch])
@@ -325,7 +345,7 @@ def generar_pdf_fecha(fecha):
         elementos.append(Paragraph("Top 5 Productos del Dia", encabezado_style))
         datos_top = [['Producto', 'Unidades vendidas']]
         for item in top_productos:
-            datos_top.append([item.nombre, str(int(item.cantidad))])
+            datos_top.append([safe_text(item.nombre), str(int(item.cantidad))])
         tabla_top = Table(datos_top, colWidths=[4.3 * inch, 1.7 * inch])
         tabla_top.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f2121')),
@@ -346,7 +366,7 @@ def generar_pdf_fecha(fecha):
 
         datos_egresos = [['Descripcion', 'Monto']]
         for egreso in egresos:
-            datos_egresos.append([egreso.descripcion, f'${egreso.monto:.2f}'])
+            datos_egresos.append([safe_text(egreso.descripcion), f'${egreso.monto:.2f}'])
 
         tabla_egresos = Table(datos_egresos, colWidths=[4*inch, 2*inch])
         tabla_egresos.setStyle(TableStyle([
