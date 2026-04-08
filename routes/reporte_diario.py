@@ -9,12 +9,19 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+from utils.tz_utils import (
+    ahora_utc,
+    ahora_local,
+    fecha_operativa_hoy,
+    fecha_operativa_de,
+    rango_utc_de_fecha,
+    formatear_local,
+    APP_TZ,
+    APP_TIMEZONE_NAME,
+)
 import io
 import os
 import pytz
-
-# Zona horaria de Ecuador (mismo estandar que el resto de modulos)
-ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
 
 # Blueprint para los reportes diarios
 reporte_diario_bp = Blueprint('reporte_diario', __name__, url_prefix='/reporte-diario')
@@ -35,9 +42,8 @@ def safe_text(value):
 @reporte_diario_bp.route('/pdf', methods=['GET'])
 @login_required
 def generar_pdf():
-    """Genera PDF del reporte diario para hoy (Hora Ecuador)"""
-    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
-    hoy = ahora_local.date()
+    """Genera PDF del reporte del dia de negocio de hoy (zona Ecuador)."""
+    hoy = fecha_operativa_hoy()
     try:
         return generar_pdf_fecha(hoy)
     except Exception as e:
@@ -65,49 +71,42 @@ def generar_pdf_historico(fecha):
 @reporte_diario_bp.route('/historial', methods=['GET'])
 @login_required
 def listar_historial():
-    """Lista los últimos 30 días con reportes disponibles"""
-    # Usamos hoy segun Ecuador
-    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
-    hoy_local = ahora_local.date()
+    """Lista los ultimos 30 dias con reportes disponibles, usando fecha_operativa."""
+    hoy_local    = fecha_operativa_hoy()
     hace_30_dias = hoy_local - timedelta(days=30)
-    
-    # Convertimos a UTC para consultar en la base de datos
-    inicio_30_local = ZONA_HORARIA_LOCAL.localize(datetime(hace_30_dias.year, hace_30_dias.month, hace_30_dias.day, 0, 0, 0))
-    inicio_30_utc   = inicio_30_local.astimezone(pytz.utc).replace(tzinfo=None)
-    
-    cajas = Caja.query.filter(
-        Caja.fecha >= inicio_30_utc
-    ).order_by(Caja.fecha.desc()).all()
 
-    
+    # Buscamos cajas por fecha_operativa (inmune al UTC crossover).
+    cajas = Caja.query.filter(
+        Caja.fecha_operativa >= hace_30_dias
+    ).order_by(Caja.fecha_operativa.desc()).all()
+
     return jsonify([{
-        'fecha': str(caja.fecha.date()),
-        'estado': caja.estado,
-        'total_vendido': float(caja.total_ingresos or 0)
-    } for caja in cajas])
+        # Usamos fecha_operativa si existe; fallback al timestamp UTC convertido.
+        'fecha':         str(c.fecha_operativa) if c.fecha_operativa else str(fecha_operativa_de(c.fecha)),
+        'estado':        c.estado,
+        'total_vendido': float(c.total_ingresos or 0)
+    } for c in cajas])
 
 
 def generar_pdf_fecha(fecha):
     """
-    Lógica principal para estructurar y dibujar el reporte PDF usando la librería ReportLab.
-    'fecha' es un objeto date en horario local.
+    Logica principal para generar el PDF de un dia de negocio especifico.
+    'fecha' es un objeto date en la zona horaria local del negocio.
+    Usa rango_utc_de_fecha para obtener el rango correcto en UTC.
     """
-    # 1. Obtener rango en UTC para consultar la base de datos
-    inicio_dia_local = ZONA_HORARIA_LOCAL.localize(datetime(fecha.year, fecha.month, fecha.day, 0, 0, 0))
-    fin_dia_local    = ZONA_HORARIA_LOCAL.localize(datetime(fecha.year, fecha.month, fecha.day, 23, 59, 59))
-    
-    inicio_dia_utc = inicio_dia_local.astimezone(pytz.utc).replace(tzinfo=None)
-    fin_dia_utc    = fin_dia_local.astimezone(pytz.utc).replace(tzinfo=None)
+    inicio_dia_utc, fin_dia_utc = rango_utc_de_fecha(fecha)
 
-    # Caja del día
-    caja = Caja.query.filter(
-        Caja.fecha >= inicio_dia_utc,
-        Caja.fecha <= fin_dia_utc
-    ).first()
-
+    # Caja del dia: buscamos por fecha_operativa (el campo correcto).
+    # Fallback a rango UTC para cajas antiguas sin fecha_operativa.
+    caja = Caja.query.filter_by(fecha_operativa=fecha).first()
+    if not caja:
+        # Compatibilidad con registros previos al refactor.
+        caja = Caja.query.filter(
+            Caja.fecha >= inicio_dia_utc,
+            Caja.fecha <= fin_dia_utc
+        ).first()
 
     if not caja:
-        # Si no hay caja abierta ni cerrada hoy, no hay nada que reportar
         return jsonify({'error': 'No hay caja registrada para este dia. Abre la caja primero.'}), 404
 
     # Ventas del día
@@ -152,19 +151,16 @@ def generar_pdf_fecha(fecha):
     # Egresos del día
     egresos = Egreso.query.filter_by(caja_id=caja.id).all()
 
-    # Comparación con día anterior (local)
     dia_anterior = fecha - timedelta(days=1)
-    
-    inicio_ant_local = ZONA_HORARIA_LOCAL.localize(datetime(dia_anterior.year, dia_anterior.month, dia_anterior.day, 0, 0, 0))
-    fin_ant_local    = ZONA_HORARIA_LOCAL.localize(datetime(dia_anterior.year, dia_anterior.month, dia_anterior.day, 23, 59, 59))
-    
-    inicio_ant_utc = inicio_ant_local.astimezone(pytz.utc).replace(tzinfo=None)
-    fin_ant_utc    = fin_ant_local.astimezone(pytz.utc).replace(tzinfo=None)
+    inicio_ant_utc, fin_ant_utc = rango_utc_de_fecha(dia_anterior)
 
-    caja_anterior = Caja.query.filter(
-        Caja.fecha >= inicio_ant_utc,
-        Caja.fecha <= fin_ant_utc
-    ).first()
+    caja_anterior = Caja.query.filter_by(fecha_operativa=dia_anterior).first()
+    if not caja_anterior:
+        # Fallback para cajas sin fecha_operativa.
+        caja_anterior = Caja.query.filter(
+            Caja.fecha >= inicio_ant_utc,
+            Caja.fecha <= fin_ant_utc
+        ).first()
 
 
     # 2. Crear PDF
@@ -229,11 +225,11 @@ def generar_pdf_fecha(fecha):
     except Exception:
         pass  # Si el logo falla, continuamos sin el
 
-    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
+    ahora_rep = ahora_local()
     
     elementos.append(Paragraph("Helarte - Reporte de Corte", titulo_style))
     elementos.append(Paragraph(
-        f"Fecha operativa: {fecha.strftime('%d/%m/%Y')} &nbsp;&nbsp; Corte generado: {ahora_local.strftime('%d/%m/%Y %H:%M')} (hora Ecuador)",
+        f"Fecha operativa: {fecha.strftime('%d/%m/%Y')} &nbsp;&nbsp; Corte generado: {ahora_rep.strftime('%d/%m/%Y %H:%M')} (hora Ecuador)",
         subtitulo_style
     ))
 

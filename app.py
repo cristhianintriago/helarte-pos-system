@@ -239,6 +239,33 @@ def _agregar_columna_si_falta(table_name, column_name, ddl):
     print(f"Migracion aplicada: {table_name}.{column_name}")
 
 
+def _backfill_fecha_operativa_caja():
+    """
+    Asigna fecha_operativa a registros de Caja que aun no la tienen.
+    Se ejecuta una sola vez en produccion cuando se despliega esta version.
+    Convierte el timestamp UTC de apertura de caja a la fecha local de Ecuador.
+
+    Por que es necesario:
+    - Cajas abiertas antes de este deployment no tienen fecha_operativa.
+    - Sin ella, las consultas por fecha de negocio no las encontrarian.
+    - La fecha se calcula restando el offset UTC-5 del timestamp guardado.
+    """
+    from models.models import Caja
+    from utils.tz_utils import fecha_operativa_de
+
+    # Buscamos solo cajas sin fecha_operativa asignada.
+    cajas_sin_fecha = Caja.query.filter(Caja.fecha_operativa == None).all()
+    if not cajas_sin_fecha:
+        return  # Nada que backfillear.
+
+    for caja in cajas_sin_fecha:
+        if caja.fecha is not None:
+            caja.fecha_operativa = fecha_operativa_de(caja.fecha)
+
+    db.session.commit()
+    print(f"Backfill fecha_operativa: {len(cajas_sin_fecha)} caja(s) actualizadas.")
+
+
 def _sincronizar_esquema_legacy():
     """
     Aplica todas las migraciones aditivas necesarias para actualizar una base de datos
@@ -275,9 +302,16 @@ def _sincronizar_esquema_legacy():
     _agregar_columna_si_falta('caja', 'total_efectivo',      'ALTER TABLE caja ADD COLUMN total_efectivo FLOAT')
     _agregar_columna_si_falta('caja', 'total_transferencia', 'ALTER TABLE caja ADD COLUMN total_transferencia FLOAT')
 
-    # Columnas del Cierre de Caja Ciego (Blind Close), agregadas en Fase 4.
     _agregar_columna_si_falta('caja', 'monto_declarado', 'ALTER TABLE caja ADD COLUMN monto_declarado FLOAT')
     _agregar_columna_si_falta('caja', 'descuadre',       'ALTER TABLE caja ADD COLUMN descuadre FLOAT')
+
+    # Columna de fecha operativa del negocio (America/Guayaquil).
+    # Resuelve el bug de cierre de caja a las 19:00 Ecuador (= 00:00 UTC).
+    _agregar_columna_si_falta('caja', 'fecha_operativa', 'ALTER TABLE caja ADD COLUMN fecha_operativa DATE')
+
+    # Backfill: asigna fecha_operativa a cajas existentes que aun no la tienen.
+    # Convierte el timestamp UTC almacenado a la fecha local de Ecuador.
+    _backfill_fecha_operativa_caja()
 
     # Corregimos registros de productos que tengan max_sabores en NULL o valor invalido.
     # text() convierte el string a una expresion SQL ejecutable por SQLAlchemy.
