@@ -326,6 +326,17 @@ function exportarExcel() {
  * Primero verifica que haya caja disponible antes de abrir la ventana.
  */
 async function descargarPDFHoy() {
+    const desde = document.getElementById('fecha-desde').value;
+    const hasta = document.getElementById('fecha-hasta').value;
+
+    // Determinamos qué fecha usar para el PDF:
+    // Si se seleccionó un rango de un solo dia (desde == hasta), usamos esa fecha.
+    // Si el rango es "hoy" (o vacío), usamos la ruta sin fecha.
+    const hoy = new Date().toISOString().split('T')[0];
+    const esHoy      = (!desde && !hasta) || (desde === hoy && hasta === hoy);
+    const esSoloDia  = desde && hasta && desde === hasta;
+    const fechaTarget = esSoloDia ? desde : null;
+
     // Cambiamos el boton para indicar que se esta procesando
     let btn = document.querySelector('[onclick="descargarPDFHoy()"]');
     let textoOriginal = '';
@@ -336,24 +347,29 @@ async function descargarPDFHoy() {
     }
 
     try {
-        // Verificamos rapidamente si hay caja antes de abrir el PDF
-        let respuesta = await fetch('/caja/estado');
-        let datos = await respuesta.json();
-
-        if (datos.estado !== 'abierta') {
-            mostrarToast('No hay caja abierta hoy. Abre la caja para generar el reporte.', 'warning');
-            return;
+        // Para reportes del dia actual verificamos si hay caja abierta.
+        // Para reportes históricos no es necesaria esa validación.
+        if (esHoy) {
+            let respuesta = await fetch('/caja/estado');
+            let datos = await respuesta.json();
+            if (datos.estado !== 'abierta') {
+                mostrarToast('No hay caja abierta hoy. Abre la caja para generar el reporte.', 'warning');
+                return;
+            }
         }
 
-        // Todo OK: abrimos el PDF en una nueva pestaña
-        mostrarToast('Generando corte PDF en tiempo real...', 'info');
-        window.open('/reporte-diario/pdf', '_blank');
+        // Construimos la URL correcta segun la fecha
+        const url = fechaTarget
+            ? `/reporte-diario/pdf/${fechaTarget}`
+            : '/reporte-diario/pdf';
+
+        mostrarToast('Generando corte PDF...', 'info');
+        window.open(url, '_blank');
 
     } catch (error) {
         console.error(error);
         mostrarToast('Error al generar el reporte PDF', 'danger');
     } finally {
-        // Siempre devolvemos el boton a su estado original
         if (btn) {
             btn.innerHTML = textoOriginal;
             btn.disabled = false;
