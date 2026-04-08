@@ -442,6 +442,56 @@ h4 i {
     gap: 1.5rem;
 }
 
+/* ===== SELECTOR DE SABORES (modal) ===== */
+.sabor-selector-lista {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.sabor-opcion {
+    flex: 1 1 calc(50% - 0.4rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--borde);
+    border-radius: var(--radio);
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 0.95rem;
+    text-align: center;
+    transition: var(--transicion);
+    background: var(--blanco);
+    color: var(--texto);
+    user-select: none;
+}
+
+.sabor-opcion:hover {
+    border-color: var(--rosa);
+    background: var(--rosa-light);
+    color: var(--rosa);
+}
+
+/* Ocultar los inputs reales; el clic se maneja via el <label> */
+.sabor-opcion input {
+    display: none;
+}
+
+/* Estado seleccionado - compatible con browsers modernos */
+.sabor-opcion:has(input:checked) {
+    border-color: var(--rosa);
+    background: var(--rosa);
+    color: #fff;
+}
+
+/* Fallback para browsers sin :has() - la clase se añade via JS */
+.sabor-opcion.seleccionado {
+    border-color: var(--rosa);
+    background: var(--rosa);
+    color: #fff;
+}
+
 /* ===== LIST GROUP ===== */
 .list-group-item {
     border-color: var(--borde) !important;
