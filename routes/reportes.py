@@ -19,20 +19,17 @@ from flask import Blueprint, jsonify, request, Response, send_file
 from flask_login import login_required, current_user
 from models.models import db, Venta, DetallePedido, Producto
 from datetime import datetime, date, time
-from sqlalchemy import func
+from sqlalchemy import func, text
 from io import StringIO, BytesIO
 import csv
-import pytz
-
-# Zona horaria de Ecuador (UTC-5, sin cambio de horario de verano)
-ZONA_HORARIA_LOCAL = pytz.timezone('America/Guayaquil')
-
-def a_hora_local(fecha_utc):
-    """Convierte una fecha guardada en UTC a la hora local de Ecuador."""
-    if fecha_utc is None:
-        return fecha_utc
-    fecha_con_zona = pytz.utc.localize(fecha_utc)
-    return fecha_con_zona.astimezone(ZONA_HORARIA_LOCAL)
+from utils.tz_utils import (
+    ahora_local,
+    fecha_operativa_hoy,
+    rango_utc_de_fecha,
+    formatear_local,
+    APP_TIMEZONE_NAME,
+    APP_TZ,
+)
 
 reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 
@@ -43,28 +40,20 @@ reportes_bp = Blueprint('reportes', __name__, url_prefix='/reportes')
 
 def _rango_fechas(desde_str, hasta_str):
     """
-    Convierte strings de fecha en objetos datetime con hora de inicio y fin.
+    Convierte strings de fecha en objetos datetime UTC para filtrar en la BD.
     Si no se reciben parametros, usa el dia de hoy segun Ecuador por defecto.
     """
-    # Determinamos 'hoy' segun Ecuador
-    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
-    hoy_local   = ahora_local.date()
+    hoy_local = fecha_operativa_hoy()
 
     desde_str = desde_str or hoy_local.strftime('%Y-%m-%d')
     hasta_str = hasta_str or hoy_local.strftime('%Y-%m-%d')
-    
-    # Convertimos strings a datetime (naive)
-    desde_dt = datetime.strptime(desde_str, '%Y-%m-%d')
-    hasta_dt = datetime.strptime(hasta_str, '%Y-%m-%d')
-    
-    # Localizamos a Ecuador (00:00:00 y 23:59:59)
-    desde_loc = ZONA_HORARIA_LOCAL.localize(datetime(desde_dt.year, desde_dt.month, desde_dt.day, 0, 0, 0))
-    hasta_loc = ZONA_HORARIA_LOCAL.localize(datetime(hasta_dt.year, hasta_dt.month, hasta_dt.day, 23, 59, 59))
-    
-    # Convertimos a UTC para la base de datos
-    desde_utc = desde_loc.astimezone(pytz.utc).replace(tzinfo=None)
-    hasta_utc = hasta_loc.astimezone(pytz.utc).replace(tzinfo=None)
-    
+
+    desde_date = datetime.strptime(desde_str, '%Y-%m-%d').date()
+    hasta_date  = datetime.strptime(hasta_str, '%Y-%m-%d').date()
+
+    desde_utc, _       = rango_utc_de_fecha(desde_date)
+    _,         hasta_utc = rango_utc_de_fecha(hasta_date)
+
     return desde_utc, hasta_utc
 
 
@@ -117,11 +106,20 @@ def obtener_reporte():
 
     total_vendido = sum(v.total for v in ventas)
 
-    # Deteccion del motor de base de datos activo.
-    # SQLite no soporta db.cast(..., db.Date) correctamente en todos los casos,
-    # mientras que PostgreSQL lo requiere para agrupar por fecha sin la hora.
-    is_sqlite = 'sqlite' in str(db.engine.url)
-    date_expr = func.date(Venta.fecha) if is_sqlite else db.cast(Venta.fecha, db.Date)
+    # Deteccion del motor para construir la expresion de fecha en zona local.
+    # - PostgreSQL: convierte el timestamp UTC a Ecuador antes de extraer la fecha.
+    #   Esto garantiza que ventas a las 20:00 Ecuador (01:00 UTC siguiente) se
+    #   agrupen bajo el dia correcto del negocio.
+    # - SQLite (desarrollo local): func.date() usa UTC, pero es aceptable en dev.
+    is_sqlite  = 'sqlite' in str(db.engine.url)
+    if is_sqlite:
+        date_expr = func.date(Venta.fecha)
+    else:
+        # AT TIME ZONE convierte el timestamp UTC al instante en zona local,
+        # luego ::date extrae solo la parte de fecha ya en hora Ecuador.
+        date_expr = func.date(
+            func.timezone(APP_TIMEZONE_NAME, Venta.fecha)
+        )
 
     # Consulta de agregacion: agrupa las ventas por dia y calcula totales.
     # El resultado es una lista de filas con (fecha, cantidad_ventas, suma_ventas).
@@ -180,31 +178,25 @@ def obtener_reporte():
 @reportes_bp.route('/dashboard-hoy', methods=['GET'])
 @login_required
 def dashboard_hoy():
-    # Usamos la hora local de Ecuador para el rango y para clasificar las ventas por hora
-    ahora_local = datetime.now(ZONA_HORARIA_LOCAL)
-    hoy_local   = ahora_local.date()
-
-    inicio_local = ZONA_HORARIA_LOCAL.localize(datetime(hoy_local.year, hoy_local.month, hoy_local.day, 0, 0, 0))
-    fin_local    = ZONA_HORARIA_LOCAL.localize(datetime(hoy_local.year, hoy_local.month, hoy_local.day, 23, 59, 59))
-    inicio_utc   = inicio_local.astimezone(pytz.utc).replace(tzinfo=None)
-    fin_utc      = fin_local.astimezone(pytz.utc).replace(tzinfo=None)
+    hoy_local  = fecha_operativa_hoy()
+    import pytz
+    inicio_utc, fin_utc = rango_utc_de_fecha(hoy_local)
 
     ventas_hoy = Venta.query.filter(Venta.fecha >= inicio_utc, Venta.fecha <= fin_utc).all()
 
-    # Etiquetas del eje X del grafico en hora local: "00:00", "01:00", ..., "23:00".
     labels           = [f"{h:02d}:00" for h in range(24)]
     ventas_por_hora  = [0.0] * 24
     tickets_por_hora = [0]   * 24
 
     for venta in ventas_hoy:
-        # Convertimos la hora UTC de la BD a la hora local de Ecuador
-        fecha_local = pytz.utc.localize(venta.fecha).astimezone(ZONA_HORARIA_LOCAL)
+        # Convertimos la hora UTC de la BD a la hora local del negocio.
+        fecha_local = pytz.utc.localize(venta.fecha).astimezone(APP_TZ)
         hora = fecha_local.hour
         ventas_por_hora[hora]  += float(venta.total)
         tickets_por_hora[hora] += 1
 
     return jsonify({
-        'fecha':            hoy_local.strftime('%Y-%m-%d'),
+        'fecha':             hoy_local.strftime('%Y-%m-%d'),
         'total_vendido_hoy': round(sum(ventas_por_hora), 2),
         'total_tickets_hoy': len(ventas_hoy),
         'labels':            labels,
@@ -238,7 +230,7 @@ def exportar_csv():
         pedido = venta.pedido
         writer.writerow([
             venta.id,
-            a_hora_local(venta.fecha).strftime('%Y-%m-%d %H:%M:%S'),
+            formatear_local(venta.fecha, '%Y-%m-%d %H:%M:%S'),
             pedido.cliente_nombre if pedido else '',
             pedido.tipo           if pedido else '',
             venta.forma_pago,
@@ -281,7 +273,7 @@ def exportar_excel():
         pedido = venta.pedido
         ws.append([
             venta.id,
-            a_hora_local(venta.fecha).strftime('%Y-%m-%d %H:%M:%S'),
+            formatear_local(venta.fecha, '%Y-%m-%d %H:%M:%S'),
             pedido.cliente_nombre if pedido else '',
             pedido.tipo           if pedido else '',
             venta.forma_pago,
@@ -323,7 +315,7 @@ def listar_ventas():
         'tipo':      v.pedido.tipo           if v.pedido else '—',
         'forma_pago': v.forma_pago,
         'total':     v.total,
-        'fecha':     a_hora_local(v.fecha).strftime('%d/%m/%Y %H:%M')
+        'fecha':     formatear_local(v.fecha, '%d/%m/%Y %H:%M')
     } for v in ventas])
 
 

@@ -182,7 +182,13 @@ class Caja(db.Model):
     __tablename__ = 'caja'
 
     id    = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.now)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Fecha operativa del negocio (zona horaria local, America/Guayaquil).
+    # Se establece al abrir la caja y nunca cambia aunque el timestamp UTC cruce el dia.
+    # Esto garantiza que una caja abierta a las 20:00 Ecuador pertenece al dia correcto,
+    # aunque su timestamp UTC sea del dia siguiente.
+    fecha_operativa = db.Column(db.Date, nullable=True, index=True)
 
     # Dinero con el que se abre la caja al inicio del turno.
     monto_inicial = db.Column(db.Float, nullable=False)
