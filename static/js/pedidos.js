@@ -864,9 +864,18 @@ function setFormaPago(forma) {
     contenedorExtra.style.display = 'block';
 
     if (forma === 'efectivo') {
-        if (compEfectivo) compEfectivo.style.display = 'block';
+        compComprobante.style.display = 'none';
+        compMixto.style.display       = 'none';
+        if (compEfectivo) compEfectivo.style.display = 'flex';
         calcularCambioEfectivo();
+    } else if (forma === 'transferencia') {
+        compComprobante.style.display = 'block';
+        compMixto.style.display       = 'none';
+        if (compEfectivo) compEfectivo.style.display = 'none';
     } else {
+        // Mixto: efectivo + transferencia.
+        compMixto.style.display       = 'flex';
+        compComprobante.style.display = 'none';
         if (compEfectivo) compEfectivo.style.display = 'none';
     }
 }
@@ -932,20 +941,20 @@ function calcularCambioEfectivo() {
  */
 function limpiarPedido() {
     pedidoActual.productos = [];
-    document.getElementById('cliente-nombre').value      = 'Consumidor final';
-    document.getElementById('numero-comprobante').value  = '';
-    document.getElementById('monto-efectivo').value      = '';
-    document.getElementById('monto-transferencia').value = '';
-    
-    // Limpiar factura
-    document.getElementById('cliente-direccion-basica').value = '';
-    document.getElementById('cliente-telefono-basico').value = '';
-    document.getElementById('cliente-identificacion').value = '';
-    document.getElementById('cliente-razon-social').value = '';
-    document.getElementById('cliente-correo').value = '';
-    document.getElementById('cliente-direccion-sri').value = '';
-    document.getElementById('cliente-telefono-sri').value = '';
-    
+
+    // Limpiar todos los campos del formulario de forma segura
+    const todosLosCampos = [
+        'cliente-nombre', 'numero-comprobante', 'numero-comprobante-mixto',
+        'monto-efectivo', 'monto-transferencia',
+        'cliente-direccion-basica', 'cliente-telefono-basico',
+        'cliente-identificacion', 'cliente-razon-social',
+        'cliente-correo', 'cliente-direccion-sri', 'cliente-telefono-sri'
+    ];
+    todosLosCampos.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = id === 'cliente-nombre' ? 'Consumidor final' : '';
+    });
+
     const mr = document.getElementById('monto-recibido');
     if (mr) mr.value = '';
     const dc = document.getElementById('display-cambio');
@@ -953,7 +962,8 @@ function limpiarPedido() {
         dc.textContent = '$0.00';
         dc.className = 'h3 fw-800 text-menta-dark';
     }
-    document.getElementById('validacion-montos').style.display = 'none';
+    const vm = document.getElementById('validacion-montos');
+    if (vm) vm.style.display = 'none';
 
     setTipo('local');
     setFormaPago('efectivo');
@@ -1010,9 +1020,13 @@ async function confirmarPedido() {
         return;
     }
 
-    const numComprobante = document.getElementById('numero-comprobante').value.trim();
-    const mEfectivo      = parseFloat(document.getElementById('monto-efectivo').value) || 0;
-    const mTransferencia = parseFloat(document.getElementById('monto-transferencia').value) || 0;
+    // Leer comprobante del campo correcto según el método de pago
+    const numComprobanteTransf = document.getElementById('numero-comprobante')?.value.trim() || '';
+    const numComprobanteMixto  = document.getElementById('numero-comprobante-mixto')?.value.trim() || '';
+    const numComprobante = formaPagoActual === 'mixto' ? numComprobanteMixto : numComprobanteTransf;
+
+    const mEfectivo      = parseFloat(document.getElementById('monto-efectivo')?.value) || 0;
+    const mTransferencia = parseFloat(document.getElementById('monto-transferencia')?.value) || 0;
 
     if (formaPagoActual === 'transferencia' && !numComprobante) {
         mostrarToast('Debes ingresar el numero de comprobante', 'warning');
@@ -1037,13 +1051,14 @@ async function confirmarPedido() {
         }
 
         const totalVal = calcularTotalActual();
-        // Usamos margen de 0.01 para tolerar errores de redondeo en numeros decimales.
         if (Math.abs((mEfectivo + mTransferencia) - totalVal) > 0.01) {
-            document.getElementById('validacion-montos').style.display = 'block';
+            const vm = document.getElementById('validacion-montos');
+            if (vm) vm.style.display = 'block';
             mostrarToast('Los montos no suman el total del pedido', 'warning');
             return;
         }
-        document.getElementById('validacion-montos').style.display = 'none';
+        const vm = document.getElementById('validacion-montos');
+        if (vm) vm.style.display = 'none';
     }
 
     setConfirmandoPedido(true);
