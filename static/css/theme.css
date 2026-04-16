@@ -855,3 +855,72 @@ hr { border-color: var(--borde); opacity: 1; }
     }
 }
 
+
+
+/* =====================================================
+   CORRECCIONES RESPONSIVAS — Modal de Checkout
+   ===================================================== */
+
+/* Fix: .form-control dentro de .input-group no debe tener
+   border-radius en los lados que colindan con el prefijo/sufijo.
+   Sin esto, el $ queda visualmente separado del input en movil. */
+.input-group > .form-control:not(:first-child),
+.input-group > .form-control:not(:last-child) {
+    border-radius: 0 !important;
+}
+.input-group > .form-control:last-child {
+    border-radius: 0 10px 10px 0 !important;
+}
+.input-group > .form-control:first-child {
+    border-radius: 10px 0 0 10px !important;
+}
+/* Cuando el input va entre input-group-text y un boton,
+   el border-right desaparece para no duplicar el borde */
+.input-group > .form-control:not(:last-child) {
+    border-right: none !important;
+}
+
+/* Fix: Pago mixto — col-6 col-6 comprime demasiado en movil.
+   En el modal (max ~480px) colapsa a columna unica. */
+@media (max-width: 500px) {
+    #campos-mixto .col-6 {
+        flex: 0 0 100%;
+        max-width: 100%;
+    }
+}
+
+/* Mejora: display-cambio con estilo pill legible */
+#display-cambio {
+    display: inline-block;
+    padding: 0.35rem 0.9rem;
+    border-radius: 50px;
+    background: var(--menta-light, #e6faf7);
+    color: var(--menta-dark, #1a8a76);
+    font-size: 1.4rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    transition: background 0.2s, color 0.2s;
+}
+
+/* Modal checkout: ocupa toda la pantalla en movil para poder
+   hacer scroll comodamente sin elementos cortados */
+@media (max-width: 576px) {
+    #modal-checkout .modal-dialog {
+        margin: 0;
+        max-width: 100%;
+        min-height: 100%;
+    }
+    #modal-checkout .modal-content {
+        border-radius: 0 !important;
+        min-height: 100dvh;
+    }
+    #modal-checkout .modal-body {
+        padding: 1rem !important;
+    }
+    #modal-checkout .modal-footer {
+        padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)) !important;
+    }
+    #modal-checkout .modal-footer button {
+        flex: 1;
+    }
+}
