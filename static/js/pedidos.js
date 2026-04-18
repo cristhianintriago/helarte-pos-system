@@ -718,10 +718,6 @@ function actualizarCheckoutTotal(total) {
     if (target) {
         target.textContent = `$${Number(total).toFixed(2)}`;
     }
-    // Si la funcion de cambio existe y el pago es efectivo, la disparamos.
-    if (typeof calcularCambioEfectivo === 'function') {
-        calcularCambioEfectivo();
-    }
 }
 
 /**
@@ -839,29 +835,26 @@ function setFormaPago(forma) {
         if (btn) btn.className = `btn btn-sm flex-fill ${f === forma ? 'btn-dark' : 'btn-outline-dark'}`;
     });
 
-    const contenedorExtra  = document.getElementById('campos-pago-extra');
-    const compComprobante  = document.getElementById('campo-comprobante');
-    const compMixto        = document.getElementById('campos-mixto');
-    const compEfectivo     = document.getElementById('campos-efectivo');
+    const contenedorExtra = document.getElementById('campos-pago-extra');
+    const compComprobante = document.getElementById('campo-comprobante');
+    const compMixto       = document.getElementById('campos-mixto');
 
     if (!contenedorExtra || !compComprobante || !compMixto) return;
 
-    contenedorExtra.style.display = 'block';
-
     if (forma === 'efectivo') {
+        // Efectivo: no requiere campos adicionales, ocultamos el panel extra.
+        contenedorExtra.style.display = 'none';
         compComprobante.style.display = 'none';
         compMixto.style.display       = 'none';
-        if (compEfectivo) compEfectivo.style.display = 'flex';
-        calcularCambioEfectivo();
     } else if (forma === 'transferencia') {
+        contenedorExtra.style.display = 'block';
         compComprobante.style.display = 'block';
         compMixto.style.display       = 'none';
-        if (compEfectivo) compEfectivo.style.display = 'none';
     } else {
         // Mixto: efectivo + transferencia.
+        contenedorExtra.style.display = 'block';
         compMixto.style.display       = 'flex';
         compComprobante.style.display = 'none';
-        if (compEfectivo) compEfectivo.style.display = 'none';
     }
 }
 
@@ -940,13 +933,6 @@ function limpiarPedido() {
         if (el) el.value = id === 'cliente-nombre' ? 'Consumidor final' : '';
     });
 
-    const mr = document.getElementById('monto-recibido');
-    if (mr) mr.value = '';
-    const dc = document.getElementById('display-cambio');
-    if (dc) {
-        dc.textContent = '$0.00';
-        dc.className = 'h3 fw-800 text-menta-dark';
-    }
     const vm = document.getElementById('validacion-montos');
     if (vm) vm.style.display = 'none';
 
@@ -1018,16 +1004,7 @@ async function confirmarPedido() {
         return;
     }
 
-    if (formaPagoActual === 'efectivo') {
-        const recibido = parseFloat(document.getElementById('monto-recibido')?.value) || 0;
-        const totalReq = parseFloat(calcularTotalActual().toFixed(2));
-        const recibidoRounded = parseFloat(recibido.toFixed(2));
-        
-        if (recibidoRounded > 0 && recibidoRounded < totalReq) {
-            mostrarToast(`Faltan $${(totalReq - recibidoRounded).toFixed(2)} para completar el pago`, 'warning');
-            return;
-        }
-    }
+    // Efectivo: sin validacion de monto recibido (el campo fue eliminado).
 
     if (formaPagoActual === 'mixto') {
         if (!numComprobante) {
@@ -1065,11 +1042,12 @@ async function confirmarPedido() {
             return;
         }
     } else {
-        dbNombre = document.getElementById('cliente-nombre').value.trim() || 'Consumidor final';
-        dbDireccion = document.getElementById('cliente-direccion-basica').value.trim() || null;
-        dbTelefono = document.getElementById('cliente-telefono-basico').value.trim() || null;
+        dbNombre         = document.getElementById('cliente-nombre')?.value.trim() || 'Consumidor final';
+        // Usamos ?. porque estos campos opcionales pueden no estar presentes en el DOM.
+        dbDireccion      = document.getElementById('cliente-direccion-basica')?.value.trim() || null;
+        dbTelefono       = document.getElementById('cliente-telefono-basico')?.value.trim()  || null;
         dbIdentificacion = '9999999999999'; // Consumidor final ID por defecto
-        dbCorreo = null;
+        dbCorreo         = null;
     }
 
     // Construimos el objeto JSON que esperan los endpoints de pedidos.

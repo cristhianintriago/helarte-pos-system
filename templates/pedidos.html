@@ -206,16 +206,6 @@
 
           <!-- Campos extra de pago (dinámico) -->
           <div id="campos-pago-extra" class="bg-light p-3 rounded-3" style="display: none;">
-            <!-- Efectivo -->
-            <div id="campos-efectivo" style="display: none;">
-              <label class="form-label fw-bold small text-muted mb-1">Monto Recibido</label>
-              <div class="input-group mb-2">
-                <span class="input-group-text bg-white">$</span>
-                <input type="number" id="monto-recibido" oninput="calcularCambioEfectivo()" class="form-control fw-bold fs-5" step="0.01" min="0" placeholder="0.00" inputmode="decimal">
-              </div>
-              <label class="form-label fw-bold small text-muted mb-1">Cambio a Devolver</label>
-              <div class="h3 fw-800 text-menta-dark" id="display-cambio">$0.00</div>
-            </div>
 
             <!-- Comprobante (Transferencia) -->
             <div id="campo-comprobante" style="display: none;">
@@ -264,5 +254,5 @@
 
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/pedidos.js') }}?v=5"></script>
+<script src="{{ url_for('static', filename='js/pedidos.js') }}?v=7"></script>
 {% endblock %}
