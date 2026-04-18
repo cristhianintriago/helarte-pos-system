@@ -2,7 +2,8 @@
  * admin.js
  * --------
  * Logica del panel de administracion exclusivo para el usuario root.
- * Permite gestionar y eliminar registros historicos de caja y ventas.
+ * Permite gestionar y eliminar registros historicos de caja y ventas,
+ * y exportar / importar el catalogo de productos y sabores.
  *
  * Este modulo es critico: las operaciones de eliminacion son irreversibles.
  * Por eso se solicita confirmacion del usuario antes de cada operacion destructiva.
@@ -227,6 +228,165 @@ async function eliminarVentasSeleccionadas() {
         cargarVentas();
     } else {
         mostrarToast(datos.error, 'danger');
+    }
+}
+
+
+// ==========================================
+// EXPORTAR / IMPORTAR CATALOGO
+// ==========================================
+
+/**
+ * Descarga el catalogo completo de productos y sabores como un archivo JSON.
+ * Llama a GET /admin/exportar-catalogo; el servidor responde con Content-Disposition
+ * attachment, lo que hace que el navegador lo guarde automaticamente.
+ *
+ * Tecnica: creamos un <a> invisible con la URL del endpoint, simulamos el click
+ * y lo eliminamos. De esta forma el fetch no es necesario: el navegador gestiona
+ * la descarga directamente igual que cuando el usuario hace clic en un enlace.
+ */
+async function exportarCatalogo() {
+    const btn = document.getElementById('btn-exportar-catalogo');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Generando...';
+    }
+
+    try {
+        // Hacemos un fetch para poder detectar errores HTTP antes de la descarga.
+        const respuesta = await fetch('/admin/exportar-catalogo');
+        if (!respuesta.ok) {
+            const datos = await respuesta.json().catch(() => ({}));
+            throw new Error(datos.error || `Error HTTP ${respuesta.status}`);
+        }
+
+        // Convertimos la respuesta en un Blob (Binary Large Object) y creamos
+        // una URL temporal para que el navegador pueda descargar el contenido.
+        const blob     = await respuesta.blob();
+        const urlBlob  = URL.createObjectURL(blob);
+
+        // Extraemos el nombre del archivo del header Content-Disposition.
+        const disposition = respuesta.headers.get('Content-Disposition') || '';
+        const match       = disposition.match(/filename="([^"]+)"/);
+        const nombreArchivo = match ? match[1] : 'catalogo_helarte.json';
+
+        // Creamos un enlace invisible, lo activamos para descargar y lo destruimos.
+        const enlace = document.createElement('a');
+        enlace.href     = urlBlob;
+        enlace.download = nombreArchivo;
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+
+        // Liberamos la URL temporal de memoria.
+        URL.revokeObjectURL(urlBlob);
+
+        mostrarToast(`Catalogo exportado: ${nombreArchivo}`, 'success');
+    } catch (error) {
+        mostrarToast(error.message || 'Error al exportar el catalogo', 'danger');
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-download me-1"></i> Descargar JSON';
+        }
+    }
+}
+
+
+/**
+ * Importa el catalogo desde un archivo JSON seleccionado por el usuario.
+ * Envia el archivo como multipart/form-data a POST /admin/importar-catalogo.
+ * Muestra un resumen detallado del resultado (creados, actualizados, errores).
+ *
+ * @param {HTMLInputElement} inputEl - El elemento <input type="file"> que disparo el evento.
+ */
+async function importarCatalogo(inputEl) {
+    const archivo = inputEl.files[0];
+    if (!archivo) return;
+
+    // Reseteamos el input para que el usuario pueda volver a elegir el mismo archivo.
+    inputEl.value = '';
+
+    if (!archivo.name.endsWith('.json')) {
+        mostrarToast('El archivo debe tener extension .json', 'warning');
+        return;
+    }
+
+    const confirmado = confirm(
+        `Importar catálogo desde: "${archivo.name}"\n\n` +
+        `Esta operación creará o actualizará productos y sabores.\n` +
+        `Los registros existentes NO se eliminarán.\n\n` +
+        `¿Continuar?`
+    );
+    if (!confirmado) return;
+
+    // Ocultamos el resultado anterior y mostramos indicador de carga.
+    const contenedorResultado = document.getElementById('resultado-importacion');
+    const divResumen          = document.getElementById('resumen-importacion');
+    contenedorResultado.classList.add('d-none');
+
+    mostrarToast('Importando catálogo, aguarda...', 'info');
+
+    try {
+        // FormData permite enviar archivos binarios como multipart/form-data.
+        const formData = new FormData();
+        formData.append('archivo', archivo);
+
+        const respuesta = await fetch('/admin/importar-catalogo', {
+            method: 'POST',
+            body:   formData
+            // No ponemos Content-Type: el navegador lo setea automaticamente con el boundary correcto.
+        });
+
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+            throw new Error(datos.error || `Error HTTP ${respuesta.status}`);
+        }
+
+        // Construimos el HTML del resumen de la importacion.
+        const hayErrores = datos.errores && datos.errores.length > 0;
+        const erroresHtml = hayErrores
+            ? `<div class="alert alert-warning py-2 mt-2 small">
+                <strong><i class="bi bi-exclamation-triangle me-1"></i>Advertencias:</strong>
+                <ul class="mb-0 mt-1">${datos.errores.map(e => `<li>${e}</li>`).join('')}</ul>
+               </div>`
+            : '';
+
+        divResumen.innerHTML = `
+            <div class="row g-2 text-center">
+                <div class="col-6 col-md-3">
+                    <div class="bg-success bg-opacity-10 border border-success rounded p-2">
+                        <div class="fs-4 fw-bold text-success">${datos.sabores_creados}</div>
+                        <div class="small text-muted">Sabores creados</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-info bg-opacity-10 border border-info rounded p-2">
+                        <div class="fs-4 fw-bold text-info">${datos.sabores_actualizados}</div>
+                        <div class="small text-muted">Sabores actualizados</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-success bg-opacity-10 border border-success rounded p-2">
+                        <div class="fs-4 fw-bold text-success">${datos.productos_creados}</div>
+                        <div class="small text-muted">Productos creados</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="bg-info bg-opacity-10 border border-info rounded p-2">
+                        <div class="fs-4 fw-bold text-info">${datos.productos_actualizados}</div>
+                        <div class="small text-muted">Productos actualizados</div>
+                    </div>
+                </div>
+            </div>
+            ${erroresHtml}`;
+
+        contenedorResultado.classList.remove('d-none');
+        mostrarToast(datos.mensaje || 'Importacion completada', hayErrores ? 'warning' : 'success');
+
+    } catch (error) {
+        mostrarToast(error.message || 'Error al importar el catalogo', 'danger');
     }
 }
 

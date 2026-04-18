@@ -15,6 +15,70 @@
 </div>
 
 <!-- =====================================================
+     SECCIÓN: Catálogo de Ítems (Exportar / Importar)
+     ===================================================== -->
+<div class="card shadow-sm mb-4 border-primary">
+  <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-box-seam-fill"></i> Catálogo de Ítems</span>
+    <span class="badge bg-light text-primary fw-semibold">Backup & Restauración</span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">
+      Exporta el catálogo completo de productos y sabores a un archivo <code>.json</code> para hacer un respaldo,
+      o importa uno previamente exportado para restaurar o migrar el menú. La importación es
+      <strong>aditiva</strong>: nunca borra registros existentes ni afecta el historial de ventas.
+    </p>
+
+    <div class="row g-3">
+      <!-- Columna Exportar -->
+      <div class="col-md-6">
+        <div class="card h-100 border-0 bg-light">
+          <div class="card-body d-flex flex-column align-items-start gap-2">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="fs-3 text-primary"><i class="bi bi-cloud-download-fill"></i></span>
+              <div>
+                <div class="fw-bold">Exportar catálogo</div>
+                <div class="text-muted small">Descarga un JSON con todos los productos y sabores actuales.</div>
+              </div>
+            </div>
+            <button id="btn-exportar-catalogo" class="btn btn-primary btn-sm mt-auto" onclick="exportarCatalogo()">
+              <i class="bi bi-download me-1"></i> Descargar JSON
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Columna Importar -->
+      <div class="col-md-6">
+        <div class="card h-100 border-0 bg-light">
+          <div class="card-body d-flex flex-column align-items-start gap-2">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="fs-3 text-success"><i class="bi bi-cloud-upload-fill"></i></span>
+              <div>
+                <div class="fw-bold">Importar catálogo</div>
+                <div class="text-muted small">Sube un JSON exportado previamente para crear o actualizar ítems.</div>
+              </div>
+            </div>
+            <!-- Input file oculto; se activa desde el botón -->
+            <input type="file" id="input-importar-catalogo" accept=".json" class="d-none" onchange="importarCatalogo(this)">
+            <button class="btn btn-success btn-sm mt-auto" onclick="document.getElementById('input-importar-catalogo').click()">
+              <i class="bi bi-upload me-1"></i> Seleccionar JSON
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resultado de la importación (oculto por defecto) -->
+    <div id="resultado-importacion" class="mt-3 d-none">
+      <hr>
+      <h6 class="fw-bold mb-2"><i class="bi bi-clipboard2-check me-1"></i>Resultado de la importación</h6>
+      <div id="resumen-importacion"></div>
+    </div>
+  </div>
+</div>
+
+<!-- =====================================================
      SECCIÓN 1: Registros de Caja
      ===================================================== -->
 <div class="card shadow-sm mb-4">
