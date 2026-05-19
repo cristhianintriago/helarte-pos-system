@@ -24,6 +24,7 @@ o psycopg2 ya habran importado las funciones originales y el patch no tendra efe
 causando bloqueos y errores de Lock en produccion con PostgreSQL.
 """
 #test
+#testtt
 # CRITICO: el monkey_patch debe ser la PRIMERA instruccion del archivo.
 # Cualquier import antes de esta linea puede causar bugs de concurrencia
 # en produccion con Gunicorn + Eventlet + PostgreSQL.
